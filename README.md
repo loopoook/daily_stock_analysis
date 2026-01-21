@@ -40,7 +40,7 @@
 
 **无需服务器，每天自动运行！**
 
-#### 1. Fork 本仓库
+#### 1. Fork 本仓库(顺便点下⭐呀)
 
 点击右上角 `Fork` 按钮
 
@@ -147,6 +147,37 @@
 ## ⚙️ 配置说明
 
 > 📖 完整环境变量、定时任务配置请参考 [完整配置指南](docs/full-guide.md)
+
+## 🖥️ 本地 WebUI（可选）
+
+本地运行时，可启用 WebUI 来管理配置和触发分析。
+
+### 启动方式
+
+| 命令 | 说明 |
+|------|------|
+| `python main.py --webui` | 启动 WebUI + 执行一次完整分析 |
+| `python main.py --webui-only` | 仅启动 WebUI，手动触发分析 |
+
+- 访问地址：`http://127.0.0.1:8000`
+- 详细说明请参考 [配置指南 - WebUI](docs/full-guide.md#本地-webui-管理界面)
+
+### 功能特性
+
+- 📝 **配置管理** - 查看/修改 `.env` 里的自选股列表
+- 🚀 **快速分析** - 页面输入股票代码，一键触发分析
+- 📊 **实时进度** - 分析任务状态实时更新，支持多任务并行
+
+### API 接口
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/` | GET | 配置管理页面 |
+| `/health` | GET | 健康检查 |
+| `/analysis?code=xxx` | GET | 触发单只股票异步分析 |
+| `/tasks` | GET | 查询所有任务状态 |
+| `/task?id=xxx` | GET | 查询单个任务状态 |
+
 ## 📁 项目结构
 
 ```
@@ -159,11 +190,18 @@ daily_stock_analysis/
 ├── scheduler.py         # 定时任务
 ├── storage.py           # 数据存储
 ├── config.py            # 配置管理
+├── webui.py             # WebUI 入口
 ├── data_provider/       # 数据源适配器
 │   ├── akshare_fetcher.py
 │   ├── tushare_fetcher.py
 │   ├── baostock_fetcher.py
 │   └── yfinance_fetcher.py
+├── web/                 # WebUI 模块
+│   ├── server.py        # HTTP 服务器
+│   ├── router.py        # 路由管理
+│   ├── handlers.py      # 请求处理器
+│   ├── services.py      # 业务服务
+│   └── templates.py     # HTML 模板
 ├── .github/workflows/   # GitHub Actions
 ├── Dockerfile           # Docker 镜像
 └── docker-compose.yml   # Docker 编排
@@ -198,7 +236,7 @@ daily_stock_analysis/
 - [x] 定时推送
 - [x] GitHub Actions
 - [x] 港股支持
-- [ ] Web 管理界面
+- [x] Web 管理界面 (简易版)
 - [ ] 历史分析回测
 - [ ] 美股支持
 
@@ -239,7 +277,8 @@ daily_stock_analysis/
 <!-- 赞赏锚点 -->
 <a id="sponsor"></a>
 ###### ☕ 请我喝杯咖啡
-- 如果觉得本项目对你有帮助且行有余力，可以请我喝杯咖啡，支持项目的持续维护与迭代；不赞赏也完全不影响使用。
+- 如果觉得本项目对你有帮助且行有余力，可以请我喝杯咖啡，支持项目的持续维护与迭代；不赞赏也完全不影响使用。   
+<small>（赞赏时可备注联系方式，方便私信致谢与后续交流反馈）</small>
 - 感谢支持, 祝您股市长虹，拿主力当提款机。
 
 <div align="center">
