@@ -200,10 +200,10 @@ FEISHU_APP_SECRET=...
 ```env
 FEISHU_APP_ID=cli_xxx
 FEISHU_APP_SECRET=xxx
-FEISHU_USER_ID=ou_xxxxxxxxxx    # 你的 open_id
+FEISHU_USER_ID=1dc4fa71              # 推荐 user_id（跨应用通用）
 ```
 
-获取 `FEISHU_USER_ID` 的方式：在飞书中给你的应用机器人发一条消息，查看机器人日志中的 `open_id`（格式：`ou_xxxxxxxxxx`）。
+获取 `FEISHU_USER_ID` 的方式：在飞书中给你的应用机器人发一条消息，查看机器人日志中的 `user_id`（格式如 `1dc4fa71`）。
 
 配置后，分析报告会像聊天消息一样直接发到你的私聊窗口。
 
