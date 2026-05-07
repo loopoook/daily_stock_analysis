@@ -190,6 +190,22 @@ FEISHU_APP_SECRET=...
 - 当前运行环境出口 IP 是否在白名单里
 
 ## 建议的最小可用配置
+### 私聊推送（推荐个人用户）
+
+如果你不想建群、不想配 Webhook，只想让分析报告直接发到你的飞书私聊：
+
+1. 创建飞书应用（不是群机器人），获取 App ID 和 Secret
+2. 在 `.env` 中配置：
+
+```env
+FEISHU_APP_ID=cli_xxx
+FEISHU_APP_SECRET=xxx
+FEISHU_USER_ID=ou_xxxxxxxxxx    # 你的 open_id
+```
+
+获取 `FEISHU_USER_ID` 的方式：在飞书中给你的应用机器人发一条消息，查看机器人日志中的 `open_id`（格式：`ou_xxxxxxxxxx`）。
+
+配置后，分析报告会像聊天消息一样直接发到你的私聊窗口。
 
 ### 无额外安全限制
 
