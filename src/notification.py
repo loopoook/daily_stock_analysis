@@ -275,7 +275,14 @@ class NotificationService(
         if getattr(config, "wechat_webhook_url", None):
             channels.append(NotificationChannel.WECHAT)
 
-        if getattr(config, "feishu_webhook_url", None):
+        if (
+            getattr(config, "feishu_webhook_url", None)
+            or (
+                getattr(config, "feishu_app_id", None)
+                and getattr(config, "feishu_app_secret", None)
+                and getattr(config, "feishu_user_id", None)
+            )
+        ):
             channels.append(NotificationChannel.FEISHU)
 
         if (
