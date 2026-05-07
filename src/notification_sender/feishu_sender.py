@@ -155,9 +155,20 @@ class FeishuSender:
 
     # ========== SDK 私聊推送 ==========
 
+    @property
+    def _receive_id_type(self) -> str:
+        """根据 user_id 格式自动判断 ID 类型"""
+        if self._feishu_user_id and self._feishu_user_id.startswith("ou_"):
+            return "open_id"
+        return "user_id"
+
     def _send_via_sdk(self, content: str) -> bool:
         """
         通过飞书应用 SDK 发送私聊消息
+
+        自动识别 ID 类型：
+        - ou_xxx 开头 → open_id（应用级别）
+        - 其他（如 1dc4fa71）→ user_id（租户级别，跨应用通用）
 
         Args:
             content: Markdown 格式的消息内容
@@ -170,6 +181,7 @@ class FeishuSender:
 
             formatted_content = format_feishu_markdown(content)
             client = self._get_sdk_client()
+            id_type = self._receive_id_type
 
             # 构建交互卡片（支持 Markdown 渲染）
             card_data = {
@@ -196,9 +208,10 @@ class FeishuSender:
             if content_bytes > self._feishu_max_bytes:
                 return self._send_sdk_chunked(formatted_content)
 
+            logger.info("飞书 SDK 推送: id_type=%s, user_id=%s", id_type, self._feishu_user_id)
             request = (
                 CreateMessageRequest.builder()
-                .receive_id_type("open_id")
+                .receive_id_type(id_type)
                 .request_body(
                     CreateMessageRequestBody.builder()
                     .receive_id(self._feishu_user_id)
@@ -284,9 +297,10 @@ class FeishuSender:
         }
 
         client = self._get_sdk_client()
+        id_type = self._receive_id_type
         request = (
             CreateMessageRequest.builder()
-            .receive_id_type("open_id")
+            .receive_id_type(id_type)
             .request_body(
                 CreateMessageRequestBody.builder()
                 .receive_id(self._feishu_user_id)
