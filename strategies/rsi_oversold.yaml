@@ -1,0 +1,96 @@
+# RSI Oversold Bounce Strategy / RSI超跌反弹策略
+# Uses multi-period RSI to identify oversold conditions and potential bounces.
+
+name: rsi_oversold
+display_name: RSI超跌反弹
+description: 利用多周期RSI超卖区域识别超跌反弹机会，适用于短线波段操作。
+category: reversal
+core_rules: [1, 2, 5]
+required_tools:
+  - get_daily_history
+  - analyze_trend
+  - get_realtime_quote
+aliases: [RSI超跌, 超跌反弹, rsi]
+default_priority: 55
+market_regimes: [trending_down, sideways]
+
+instructions: |
+  **RSI超跌反弹策略（RSI Oversold Bounce Strategy）**
+
+  核心逻辑：RSI多周期同步超卖时，短线反弹概率大幅提升，配合量价信号做短线低吸。
+
+  ## 第一步：RSI多周期超卖判断
+  使用 `analyze_trend` 获取：
+  - `rsi_6`：短周期RSI（6日），反应最灵敏
+  - `rsi_12`：中周期RSI（12日），趋势方向参考
+  - `rsi_24`：长周期RSI（24日），大方向过滤
+  - `rsi_status`：RSI状态（overbought/oversold/neutral）
+  - `rsi_signal`：系统RSI信号
+
+  **超卖阈值参考（A股特性调整）：**
+  - `rsi_6` < 20：极度超卖，短线反弹概率高（A股散户情绪放大效应）
+  - `rsi_6` < 30：超卖区间，具备反弹条件
+  - `rsi_12` < 35：中期超卖，趋势反弹潜力更大
+  - `rsi_24` < 40：大周期仍处于偏弱状态，需谨慎（纯短线，不做波段）
+
+  **信号分级：**
+  - **强超卖信号**：rsi_6 < 20 且 rsi_12 < 35（两周期共振超卖）
+  - **标准超卖信号**：rsi_6 < 30 且 rsi_12 < 40
+  - **弱超卖信号**：仅 rsi_6 < 30（只能轻仓试探）
+
+  ## 第二步：超卖质量过滤
+
+  使用 `get_daily_history`（30日）：
+
+  **1. 下跌幅度确认（超跌不追杀跌）**
+  - 近15日跌幅 > 15%：属于超跌区域，具备反弹条件
+  - 近5日跌幅 > 8%：短期加速下跌，可能触底
+
+  **2. 量能特征**
+  - 连续缩量下跌（近5日量能逐步萎缩）→ 卖压衰竭，底部特征
+  - 突然放量下跌（单日量比 > 3）→ 可能是主力出货，需警惕
+  - 最后一根阴线缩量 → 卖盘殆尽，反弹临近
+
+  **3. 位置确认**
+  使用 `analyze_trend`：
+  - 价格靠近 MA20 或 MA60 支撑位
+  - 前期有效支撑位附近（`support_levels` 参考）
+
+  ## 第三步：反弹信号确认
+
+  **入场确认信号（必须满足1项以上）：**
+  - 当日收阳线（收盘 > 开盘）且是缩量阳线
+  - 出现长下影线（下影线 > 实体 2 倍）
+  - RSI从超卖区开始向上拐头（rsi_6今日 > 昨日，且仍在超卖区）
+  - 量比在 0.5-1.5 之间（非放量异动，自然企稳）
+
+  **排除条件（出现任一则不操作）：**
+  - 当日放量跌停或接近跌停
+  - `search_stock_news` 发现重大利空（减持/监管/亏损预告）
+  - 大盘同日大跌 > 2%（系统性风险环境下不做逆势）
+  - `rsi_24` < 30（长期超卖，可能是价值陷阱，非超跌反弹）
+
+  ## 第四步：操作策略
+
+  **买入策略（轻仓为主，超跌反弹是短线策略）：**
+  - 仓位建议：最多2-3成，超跌反弹本质是博弈
+  - 买入时机：确认信号出现后次日开盘，或尾盘确认时买入
+  - 不在跌停板上买，等待情绪宣泄完毕
+
+  **目标与止损：**
+  - 短线目标：反弹至 MA5（rsi_6 回到 40-50 中性区间）
+  - 波段目标：反弹至 MA20（rsi_12 回到 50 中性区间）
+  - 止损：跌破近期低点 1.5%（超跌底部确认失效）
+
+  **持仓管理：**
+  - 反弹至 MA5 后若无放量，第一批减仓 50%
+  - 反弹 5-8% 后若 RSI 未回到中性区，持续观察量能
+  - rsi_6 回到 50 以上且量能未明显放大，清仓离场
+
+  ## 评分调整
+  - 强超卖信号（双周期共振）：`sentiment_score +12`
+  - 标准超卖信号：`sentiment_score +8`
+  - 弱超卖信号：`sentiment_score +4`
+  - 超卖但有重大利空：不加分（风险优先）
+  - RSI超买区（rsi_6 > 75）：`sentiment_score -10`（减持信号）
+  - 在 `pattern_analysis` 中注明"RSI超卖级别"（强/标准/弱）及目标价位

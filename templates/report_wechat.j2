@@ -49,7 +49,14 @@
 {% if sniper.ideal_buy %}{% set ns.parts = ns.parts + ['🎯' ~ labels.ideal_buy_label ~ ':' ~ (sniper.ideal_buy|string)[:15]] %}{% endif %}
 {% if sniper.stop_loss %}{% set ns.parts = ns.parts + ['🛑' ~ labels.stop_loss_label ~ ':' ~ (sniper.stop_loss|string)[:15]] %}{% endif %}
 {% if sniper.take_profit %}{% set ns.parts = ns.parts + ['🎊' ~ labels.take_profit_label ~ ':' ~ (sniper.take_profit|string)[:15]] %}{% endif %}
+{% if sniper.take_profit_2 %}{% set ns.parts = ns.parts + ['🚀' ~ labels.take_profit_2_label ~ ':' ~ (sniper.take_profit_2|string)[:15]] %}{% endif %}
+{% if sniper.risk_reward_ratio %}{% set ns.parts = ns.parts + ['⚖️' ~ labels.risk_reward_label ~ ':' ~ sniper.risk_reward_ratio] %}{% endif %}
 {{ ns.parts|join(' | ') }}
+{% endif %}
+
+{% set position = battle.get('position_strategy', {}) if battle else {} %}
+{% if position.get('add_position_trigger') %}
+📈 **{{ labels.add_position_label }}**：{{ position.add_position_trigger[:80] }}{{ '...' if position.add_position_trigger|length > 80 else '' }}
 {% endif %}
 
 {% set pos_advice = core.get('position_advice', {}) if core else {} %}
@@ -67,8 +74,13 @@
 {% if fc %}
 **{{ labels.failed_checks_heading }}**:
 {% for check in fc[:3] %}
-   {{ check[:40] }}
+   {{ check[:60] }}{{ '...' if check|length > 60 else '' }}
 {% endfor %}
+{% endif %}
+
+{% set invalid_conds = battle.get('invalidation_conditions', []) if battle else [] %}
+{% if invalid_conds %}
+⚠️ **{{ labels.invalidation_heading }}**: {{ invalid_conds[0][:60] }}{{ '...' if invalid_conds[0]|length > 60 else '' }}
 {% endif %}
 
 ---

@@ -1,0 +1,94 @@
+# MACD Divergence Strategy / MACD背驰策略
+# Identifies bullish/bearish MACD divergence as reversal or continuation signals.
+
+name: macd_divergence
+display_name: MACD背驰
+description: 识别MACD顶背驰与底背驰信号，捕捉趋势反转或趋势延续减速拐点。
+category: reversal
+core_rules: [1, 2, 5]
+required_tools:
+  - get_daily_history
+  - analyze_trend
+  - get_realtime_quote
+aliases: [MACD背驰, 背驰, macd]
+default_priority: 50
+market_regimes: [trending_down, sideways]
+
+instructions: |
+  **MACD背驰策略（MACD Divergence Strategy）**
+
+  核心逻辑：价格创新高/新低，而MACD指标未同步创极值，形成背驰，预示动能衰竭。
+
+  ## 第一步：获取数据
+  使用 `analyze_trend` 获取以下指标：
+  - `macd_dif`：快慢均线差值（DIF线）
+  - `macd_dea`：DIF的9日均线（DEA/信号线）
+  - `macd_bar`：MACD柱（DIF - DEA）
+  - `macd_status`：当前MACD状态
+  - `macd_signal`：系统判断的MACD信号
+  使用 `get_daily_history`（60日）获取历史价格序列，手动判断背驰结构。
+
+  ## 第二步：底背驰（Bullish Divergence）识别——做多信号
+
+  **判定标准（必须同时满足）：**
+  1. 股价创近期新低（近20日内出现新低价格）
+  2. 对应位置的 MACD 柱（红绿柱）绝对值小于前次低点对应的 MACD 柱绝对值
+     - 即价格更低，但MACD动能更弱（绿柱缩短）
+  3. DIF线位于0轴以下，但斜率出现上翘（底背驰通常在零轴下方）
+  4. `macd_signal` 显示 "golden_cross" 或底部结构
+
+  **加分条件（满足1项以上增强信心）：**
+  - 底背驰出现在关键支撑位（MA20、前期低点）附近
+  - 当日出现缩量长下影线
+  - RSI同步出现超卖背驰（`rsi_6` < 30 且已从低位反弹）
+
+  ## 第三步：顶背驰（Bearish Divergence）识别——减仓/做空信号
+
+  **判定标准（必须同时满足）：**
+  1. 股价创近期新高（近20日内出现新高）
+  2. 对应位置的 MACD 柱绝对值小于前次高点对应的 MACD 柱绝对值
+     - 即价格更高，但MACD动能更弱（红柱缩短）
+  3. DIF线在0轴上方但斜率向下（顶背驰通常在零轴上方）
+  4. `macd_signal` 显示 "dead_cross" 或顶部结构
+
+  **加分条件：**
+  - 顶背驰出现在关键阻力位附近
+  - 当日出现放量滞涨（量大价格涨幅小）
+  - RSI同步出现超买背驰（`rsi_6` > 75）
+
+  ## 第四步：背驰强度评级
+
+  **强背驰（高置信度）：**
+  - 价格幅度差异 > 3%，MACD柱差异 > 20%
+  - 出现在重要支撑/阻力位
+  - 配合量价背驰
+
+  **弱背驰（低置信度，仅提示）：**
+  - 幅度差异较小
+  - 无量能配合
+  - 处于强趋势中途（中途背驰可能只是短暂整理）
+
+  ## 第五步：交易策略
+
+  **底背驰做多策略：**
+  - 买入区间：背驰确认后次日开盘，或当日收盘买入
+  - 止损：跌破背驰低点下方 1.5-2%
+  - 目标：前期高点或MA20压力位
+
+  **顶背驰减仓策略：**
+  - 有仓位者：出现强顶背驰即减仓 30-50%
+  - 无仓位者：不追高，等待回调确认
+  - 止损：收盘上破背驰高点（背驰失效）
+
+  ## 注意事项
+  - 背驰是概率信号，不是绝对信号，强趋势中背驰可能失效
+  - 必须通过 `search_stock_news` 检查是否有基本面消息驱动
+  - 弱背驰仅降低仓位，不可依赖弱背驰重仓逆势
+
+  ## 评分调整
+  - 底背驰确认（强）：`sentiment_score +15`
+  - 底背驰确认（弱）：`sentiment_score +7`
+  - 顶背驰确认（强）：`sentiment_score -15`
+  - 顶背驰确认（弱）：`sentiment_score -7`
+  - 背驰失效（价格继续突破）：不调整，按趋势策略处理
+  - 在 `pattern_analysis` 中注明"底背驰"或"顶背驰"及强度等级

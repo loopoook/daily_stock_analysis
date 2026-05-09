@@ -73,32 +73,30 @@
 ### 📊 {{ labels.data_perspective_heading }}
 
 {% set trend_data = data_persp.get('trend_status', {}) %}
-{% if trend_data %}
-**{{ labels.ma_alignment_label }}**: {{ trend_data.get('ma_alignment', 'N/A') }} | {{ labels.bullish_alignment_label }}: {{ '✅ ' ~ labels.yes_label if trend_data.get('is_bullish') else '❌ ' ~ labels.no_label }} | {{ labels.trend_strength_label }}: {{ trend_data.get('trend_score', 'N/A') }}/100
-{% endif %}
-
 {% set price_data = data_persp.get('price_position', {}) %}
-{% if price_data %}
-| {{ labels.price_metrics_label }} | {{ labels.current_price_label }} |
-|---------|------|
-| {{ labels.current_price_label }} | {{ price_data.get('current_price', 'N/A') }} |
-| {{ labels.ma5_label }} | {{ price_data.get('ma5', 'N/A') }} |
-| {{ labels.ma10_label }} | {{ price_data.get('ma10', 'N/A') }} |
-| {{ labels.ma20_label }} | {{ price_data.get('ma20', 'N/A') }} |
-| {{ labels.bias_ma5_label }} | {{ price_data.get('bias_ma5', 'N/A') }}% {{ price_data.get('bias_status', 'N/A') }} |
-| {{ labels.support_level_label }} | {{ price_data.get('support_level', 'N/A') }} |
-| {{ labels.resistance_level_label }} | {{ price_data.get('resistance_level', 'N/A') }} |
-{% endif %}
-
 {% set vol_data = data_persp.get('volume_analysis', {}) %}
+{% set chip_data = data_persp.get('chip_structure', {}) %}
+
+{% if trend_data or price_data %}
+| 指标 | 数值 | 说明 |
+|------|------|------|
+{% if trend_data %}
+| {{ labels.bullish_alignment_label }} | {{ '✅ 是' if trend_data.get('is_bullish') else '❌ 否' }} | {{ labels.trend_strength_label }} {{ trend_data.get('trend_score', 'N/A') }}/100 |
+{% endif %}
+{% if price_data %}
+| {{ labels.current_price_label }} | **{{ price_data.get('current_price', 'N/A') }}** | {{ labels.support_level_label }} {{ price_data.get('support_level', 'N/A') }} / {{ labels.resistance_level_label }} {{ price_data.get('resistance_level', 'N/A') }} |
+| {{ labels.bias_status_friendly_label }} | {{ price_data.get('bias_status', 'N/A') }} | 偏离短期均线 {{ price_data.get('bias_ma5', 'N/A') }}%（>5%有追高风险） |
+{% endif %}
 {% if vol_data %}
-**{{ labels.volume_label }}**: {{ labels.volume_ratio_label }} {{ vol_data.get('volume_ratio', 'N/A') }} ({{ vol_data.get('volume_status', '') }}) | {{ labels.turnover_rate_label }} {{ vol_data.get('turnover_rate', 'N/A') }}%
-💡 *{{ vol_data.get('volume_meaning', '') }}*
+| {{ labels.volume_label }} | {{ vol_data.get('volume_status', 'N/A') }} | {% if vol_data.get('volume_meaning') %}{{ vol_data.volume_meaning[:50] }}{% else %}换手率 {{ vol_data.get('turnover_rate', 'N/A') }}%{% endif %} |
+{% endif %}
+{% if chip_data %}
+| {{ labels.chip_label }} | {{ localize_chip_health(chip_data.get('chip_health', 'N/A'), report_language) }} | {{ labels.chip_profit_label }} {{ chip_data.get('profit_ratio', 'N/A') }}，{{ labels.chip_cost_label }} {{ chip_data.get('avg_cost', 'N/A') }} |
+{% endif %}
 {% endif %}
 
-{% set chip_data = data_persp.get('chip_structure', {}) %}
-{% if chip_data %}
-**{{ labels.chip_label }}**: {{ chip_data.get('profit_ratio', 'N/A') }} | {{ chip_data.get('avg_cost', 'N/A') }} | {{ chip_data.get('concentration', 'N/A') }} {{ localize_chip_health(chip_data.get('chip_health', 'N/A'), report_language) }}
+{% if vol_data and vol_data.get('volume_meaning') %}
+💡 **{{ labels.volume_meaning_label }}**：{{ vol_data.volume_meaning }}
 {% endif %}
 {% endif %}
 
@@ -109,26 +107,45 @@
 {% if sniper %}
 **📍 {{ labels.action_points_heading }}**
 
-| {{ labels.action_points_heading }} | {{ labels.current_price_label }} |
-|---------|------|
-| 🎯 {{ labels.ideal_buy_label }} | {{ clean_sniper(sniper.get('ideal_buy')) }} |
+| 操作 | 价格 |
+|------|------|
+| 🎯 {{ labels.ideal_buy_label }} | **{{ clean_sniper(sniper.get('ideal_buy')) }}** |
 | 🔵 {{ labels.secondary_buy_label }} | {{ clean_sniper(sniper.get('secondary_buy')) }} |
-| 🛑 {{ labels.stop_loss_label }} | {{ clean_sniper(sniper.get('stop_loss')) }} |
+{% if sniper.get('watch_above') %}| 👀 {{ labels.watch_above_label }} | {{ clean_sniper(sniper.get('watch_above')) }} |
+{% endif %}| 🛑 {{ labels.stop_loss_label }} | {{ clean_sniper(sniper.get('stop_loss')) }} |
 | 🎊 {{ labels.take_profit_label }} | {{ clean_sniper(sniper.get('take_profit')) }} |
+{% if sniper.get('take_profit_2') %}| 🚀 {{ labels.take_profit_2_label }} | {{ clean_sniper(sniper.get('take_profit_2')) }} |
+{% endif %}{% if sniper.get('risk_reward_ratio') %}| ⚖️ {{ labels.risk_reward_label }} | {{ sniper.get('risk_reward_ratio') }} |
+{% endif %}
 {% endif %}
 
 {% set position = battle.get('position_strategy', {}) %}
 {% if position %}
 **💰 {{ labels.suggested_position_label }}**: {{ position.get('suggested_position', 'N/A') }}
-- {{ labels.entry_plan_label }}: {{ position.get('entry_plan', 'N/A') }}
-- {{ labels.risk_control_label }}: {{ position.get('risk_control', 'N/A') }}
+
+- **{{ labels.entry_plan_label }}**：{{ position.get('entry_plan', 'N/A') }}
+- **{{ labels.risk_control_label }}**：{{ position.get('risk_control', 'N/A') }}
+{% if position.get('add_position_trigger') %}
+- **{{ labels.add_position_label }}**：{{ position.get('add_position_trigger') }}
+{% endif %}
+{% if position.get('exit_trigger') %}
+- **{{ labels.exit_trigger_label }}**：{{ position.get('exit_trigger') }}
+{% endif %}
 {% endif %}
 
 {% set checklist = battle.get('action_checklist', []) %}
 {% if checklist %}
-**✅ {{ labels.checklist_heading }}**
+**{{ labels.checklist_heading }}**
 {% for item in checklist %}
 - {{ item }}
+{% endfor %}
+{% endif %}
+
+{% set invalid_conds = battle.get('invalidation_conditions', []) %}
+{% if invalid_conds %}
+**⚠️ {{ labels.invalidation_heading }}**
+{% for cond in invalid_conds %}
+- {{ cond }}
 {% endfor %}
 {% endif %}
 {% endif %}

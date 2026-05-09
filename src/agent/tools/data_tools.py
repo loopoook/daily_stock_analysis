@@ -369,12 +369,15 @@ get_daily_history_tool = ToolDefinition(
 # ============================================================
 
 def _handle_get_chip_distribution(stock_code: str) -> dict:
-    """Get chip distribution data."""
+    """Get chip distribution data with pre-computed health assessment."""
     manager = _get_fetcher_manager()
     chip = manager.get_chip_distribution(stock_code)
 
     if chip is None:
         return {"error": f"No chip distribution data available for {stock_code}"}
+
+    from src.analyzer import _derive_chip_health
+    chip_health = _derive_chip_health(chip.profit_ratio, chip.concentration_90)
 
     return {
         "code": chip.code,
@@ -388,14 +391,18 @@ def _handle_get_chip_distribution(stock_code: str) -> dict:
         "cost_70_low": chip.cost_70_low,
         "cost_70_high": chip.cost_70_high,
         "concentration_70": chip.concentration_70,
+        # Pre-computed by system rules — use this value directly in chip_health field,
+        # do NOT re-derive chip_health from the raw numbers above.
+        "chip_health": chip_health,
     }
 
 
 get_chip_distribution_tool = ToolDefinition(
     name="get_chip_distribution",
     description="Get chip distribution analysis for a stock. Returns profit ratio, "
-                "average cost, chip concentration at 90% and 70% levels. "
-                "Useful for judging support/resistance and holding structure.",
+                "average cost, chip concentration at 90% and 70% levels, and a "
+                "pre-computed chip_health label (健康/一般/警惕). Use chip_health as-is; "
+                "do not re-derive it from the raw numbers.",
     parameters=[
         ToolParameter(
             name="stock_code",

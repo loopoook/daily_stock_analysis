@@ -191,7 +191,8 @@ class TestFillChipStructureIfNeeded(unittest.TestCase):
         self.assertEqual(cs["profit_ratio"], "67.0%")
         self.assertEqual(cs["chip_health"], "健康")
 
-    def test_no_overwrite_valid_llm_values(self) -> None:
+    def test_no_overwrite_valid_llm_values_except_chip_health(self) -> None:
+        """Non-chip_health fields are kept when valid; chip_health is always system-computed."""
         result = self._make_result(
             dashboard={
                 "data_perspective": {
@@ -207,9 +208,30 @@ class TestFillChipStructureIfNeeded(unittest.TestCase):
         chip = self._make_chip()
         fill_chip_structure_if_needed(result, chip)
         cs = result.dashboard["data_perspective"]["chip_structure"]
-        self.assertEqual(cs["profit_ratio"], "70.0%")
-        self.assertEqual(cs["avg_cost"], 1900.0)
-        self.assertEqual(cs["concentration"], "10.00%")
+        self.assertEqual(cs["profit_ratio"], "70.0%")   # valid LLM value preserved
+        self.assertEqual(cs["avg_cost"], 1900.0)         # valid LLM value preserved
+        self.assertEqual(cs["concentration"], "10.00%")  # valid LLM value preserved
+        # chip_health is always overwritten by system rule; chip fixture has profit=0.67, c90=0.11 -> 健康
+        self.assertEqual(cs["chip_health"], "健康")
+
+    def test_chip_health_always_overwritten_even_when_llm_value_differs(self) -> None:
+        """chip_health is overwritten regardless of what the LLM wrote."""
+        result = self._make_result(
+            dashboard={
+                "data_perspective": {
+                    "chip_structure": {
+                        "profit_ratio": "70.0%",
+                        "avg_cost": 1900.0,
+                        "concentration": "10.00%",
+                        "chip_health": "一般",  # LLM wrote wrong value
+                    }
+                }
+            }
+        )
+        chip = self._make_chip()  # profit=0.67, c90=0.11 -> system says 健康
+        fill_chip_structure_if_needed(result, chip)
+        cs = result.dashboard["data_perspective"]["chip_structure"]
+        # System must correct the LLM's wrong chip_health
         self.assertEqual(cs["chip_health"], "健康")
 
     def test_data_perspective_null_handled(self) -> None:

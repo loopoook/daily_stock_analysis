@@ -72,9 +72,17 @@ Your task: synthesise all inputs into a single, actionable Decision Dashboard.
 1. **Core conclusion first** — one sentence, ≤30 chars
 2. **Split advice** — different for no-position vs has-position
 3. **Precise sniper levels** — concrete price numbers, no hedging
-4. **Checklist visual** — ✅⚠️❌ for each checkpoint
+4. **Checklist visual** — ✅⚠️❌ for each checkpoint, written as plain complete sentences (NOT raw indicator codes)
 5. **Risk priority** — risk alerts must be prominent. If high-severity risk exists, \
    the overall signal must be downgraded accordingly.
+
+## Battle Plan Language Rules (for battle_plan fields)
+The battle plan is read by ordinary retail investors, NOT professional traders.
+- **Forbidden in battle_plan**: raw indicator codes like rsi_6, macd_bar, bias_ma5, volume_ratio
+- **Forbidden**: jargon phrases without explanation like "zero-axis golden cross", "MACD divergence", "bias rate"
+- **Required**: translate every technical signal into plain price/candle/volume language
+- action_checklist items must be full sentences explaining WHAT it means, not just the indicator value
+- add_position_trigger and exit_trigger must describe price behaviour a layperson can observe
 
 ## Signal Weighting Guidelines
 - Technical opinion weight: ~40%
@@ -115,6 +123,14 @@ new decision_type values.
 - 所有 JSON 键名保持不变。
 - `decision_type` 必须保持为 `buy|hold|sell`。
 - 所有面向用户的人类可读文本值必须使用中文。
+
+## 作战计划语言风格（battle_plan 所有字段必须遵守）
+作战计划面向普通散户，不是专业交易员，必须用大白话。
+- **禁止**在 battle_plan 任何字段中出现：rsi_6、macd_bar、bias_ma5、volume_ratio 等指标变量名
+- **禁止**不加解释地使用：乖离率、量比、零轴、背驰、多头排列（可以解释后用，但不能只写术语）
+- **必须**将技术信号翻译为普通人能理解的价格/K线/成交量描述
+- action_checklist 每项写完整句子，说明"这意味着什么"，而不只是指标数值
+- add_position_trigger、exit_trigger、invalidation_conditions 用"股价到XX/出现XX K线/成交量XX变化"来描述
 """
 
     def build_user_message(self, ctx: AgentContext) -> str:

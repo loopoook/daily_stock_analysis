@@ -38,24 +38,39 @@ CORE_TRADING_SKILL_POLICY_ZH = """## 默认技能基线（必须严格遵守）
 - 只做多头排列的股票，空头排列坚决不碰
 - 均线发散上行优于均线粘合
 
-### 3. 效率优先（筹码结构）
+### 3. RSI动能确认（必须检查）
+- 从 `analyze_trend` 读取 `rsi_6`、`rsi_12`、`rsi_status`
+- **最佳买入区**：rsi_6 在 45-70 之间（有动能但未超买）
+- **超买警戒**：rsi_6 > 75，不追高，等待回调；rsi_6 > 80，严禁买入
+- **超卖机会**：rsi_6 < 30 且有支撑，短线反弹概率高，但需配合趋势判断
+- **配合规则7**：强势趋势股 rsi_6 在 75-80 可以轻仓，但必须设止损
+
+### 4. MACD动能过滤（第三层确认）
+- 从 `analyze_trend` 读取 `macd_signal`、`macd_bar`、`macd_dif`、`macd_dea`
+- **加分**：DIF > DEA（金叉），零轴上方金叉优于零轴下方金叉
+- **减分**：MACD 死叉，或红柱（macd_bar > 0）持续缩短（动能衰减）
+- **禁止买入**：`macd_signal` 为 dead_cross 且价格在 MA20 下方（双重空头）
+- MACD 背驰（价格新高但MACD柱未新高）是重要的减仓/观望信号
+
+### 5. 效率优先（筹码结构）
 - 关注筹码集中度：90%集中度 < 15% 表示筹码集中
 - 获利比例分析：70-90% 获利盘时需警惕获利回吐
 - 平均成本与现价关系：现价高于平均成本 5-15% 为健康
 
-### 4. 买点偏好（回踩支撑）
+### 6. 买点偏好（回踩支撑）
 - **最佳买点**：缩量回踩 MA5 获得支撑
 - **次优买点**：回踩 MA10 获得支撑
 - **观望情况**：跌破 MA20 时观望
 
-### 5. 风险排查重点
+### 7. 风险排查重点
 - 减持公告、业绩预亏、监管处罚、行业政策利空、大额解禁
 
-### 6. 估值关注（PE/PB）
+### 8. 估值关注（PE/PB）
 - PE 明显偏高时需在风险点中说明
 
-### 7. 强势趋势股放宽
+### 9. 强势趋势股放宽
 - 强势趋势股可适当放宽乖离率要求，轻仓追踪但需设止损
+- 强势股 RSI 轻度超买（75-80）可接受，但必须同步观察 MACD 柱是否仍在扩张
 """
 
 TECHNICAL_SKILL_RULES_EN = """## Default Skill Baseline
@@ -67,6 +82,9 @@ following default risk controls as the shared baseline:
 - Bias from MA5 < 2% -> ideal buy zone; 2-5% -> small position; > 5% -> no chase
 - Shrink-pullback to MA5 is the preferred entry rhythm
 - Below MA20 -> hold off unless the active skill explicitly proves a better setup
+- RSI confirmation: rsi_6 in 45-70 is ideal for entry; rsi_6 > 75 -> no chase; rsi_6 < 30 -> potential bounce but trend-first
+- MACD filter: golden cross (DIF > DEA) above zero line is the strongest setup;
+  dead cross below MA20 is a hard veto; shrinking MACD bars signal weakening momentum
 """
 
 

@@ -95,6 +95,9 @@ class SniperPoints(BaseModel):
     secondary_buy: Optional[Union[str, int, float]] = None
     stop_loss: Optional[Union[str, int, float]] = None
     take_profit: Optional[Union[str, int, float]] = None
+    take_profit_2: Optional[Union[str, int, float]] = None
+    watch_above: Optional[Union[str, int, float]] = None
+    risk_reward_ratio: Optional[str] = None
 
 
 class PositionStrategy(BaseModel):
@@ -103,6 +106,8 @@ class PositionStrategy(BaseModel):
     suggested_position: Optional[str] = None
     entry_plan: Optional[str] = None
     risk_control: Optional[str] = None
+    add_position_trigger: Optional[str] = None
+    exit_trigger: Optional[str] = None
 
 
 class BattlePlan(BaseModel):
@@ -111,6 +116,7 @@ class BattlePlan(BaseModel):
     sniper_points: Optional[SniperPoints] = None
     position_strategy: Optional[PositionStrategy] = None
     action_checklist: Optional[List[str]] = None
+    invalidation_conditions: Optional[List[str]] = None
 
 
 class Dashboard(BaseModel):

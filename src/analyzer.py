@@ -522,8 +522,16 @@ def _build_chip_structure_from_data(chip_data: Any, language: str = "zh") -> Dic
     }
 
 
+_CHIP_KEYS_ALWAYS_OVERRIDE = frozenset({"chip_health"})
+
+
 def fill_chip_structure_if_needed(result: "AnalysisResult", chip_data: Any) -> None:
-    """When chip_data exists, fill chip_structure placeholder fields from chip_data (in-place)."""
+    """Fill chip_structure fields from chip_data (in-place).
+
+    Numeric/text fields are filled only when the LLM output a placeholder.
+    chip_health is always overwritten with the system-computed deterministic value
+    so the LLM cannot substitute its own interpretation of the raw numbers.
+    """
     if not result or not chip_data:
         return
     try:
@@ -540,12 +548,15 @@ def fill_chip_structure_if_needed(result: "AnalysisResult", chip_data: Any) -> N
         )
         # Start from a copy of cs to preserve any extra keys the LLM may have added
         merged = dict(cs)
+        changed = False
         for k in _CHIP_KEYS:
-            if _is_value_placeholder(merged.get(k)):
-                merged[k] = filled[k]
-        if merged != cs:
+            if k in _CHIP_KEYS_ALWAYS_OVERRIDE or _is_value_placeholder(merged.get(k)):
+                if merged.get(k) != filled[k]:
+                    merged[k] = filled[k]
+                    changed = True
+        if changed:
             dp["chip_structure"] = merged
-            logger.info("[chip_structure] Filled placeholder chip fields from data source (Issue #589)")
+            logger.info("[chip_structure] Filled/corrected chip fields from data source")
     except Exception as e:
         logger.warning("[chip_structure] Fill failed, skipping: %s", e)
 

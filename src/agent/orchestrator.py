@@ -949,6 +949,14 @@ class AgentOrchestrator:
             or "N/A",
         )
 
+        # Auto-compute risk_reward_ratio from sniper price levels
+        if not sniper.get("risk_reward_ratio"):
+            sniper["risk_reward_ratio"] = _compute_risk_reward_ratio(
+                sniper.get("ideal_buy"),
+                sniper.get("stop_loss"),
+                sniper.get("take_profit"),
+            )
+
         risk_alerts = self._collect_risk_alerts(ctx, intelligence)
         positive_catalysts = self._collect_positive_catalysts(ctx, intelligence)
         latest_news = _extract_latest_news_title(intelligence)
@@ -978,6 +986,12 @@ class AgentOrchestrator:
                 "entry_plan": position_advice["no_position"],
                 "risk_control": f"止损参考 {sniper.get('stop_loss', '待补充')}",
             }
+
+        # Auto-populate invalidation_conditions when LLM left them empty
+        if not battle.get("invalidation_conditions"):
+            battle["invalidation_conditions"] = _build_invalidation_conditions(
+                sniper.get("stop_loss"), decision_type
+            )
 
         data_perspective = dashboard_block.get("data_perspective")
         if not isinstance(data_perspective, dict):
@@ -1563,6 +1577,47 @@ def _level_values_equal(left: Any, right: Any) -> bool:
         and right_normalized is not None
         and left_normalized == right_normalized
     )
+
+
+def _compute_risk_reward_ratio(
+    buy: Any, stop_loss: Any, take_profit: Any
+) -> str:
+    """Compute risk/reward ratio from sniper price levels.
+
+    Returns a formatted string like '1:2.5' or 'N/A' when prices are unavailable.
+    """
+    try:
+        b = float(buy)
+        sl = float(stop_loss)
+        tp = float(take_profit)
+        if b <= 0 or sl <= 0 or tp <= 0:
+            return "N/A"
+        risk = abs(b - sl)
+        reward = abs(tp - b)
+        if risk == 0:
+            return "N/A"
+        ratio = reward / risk
+        return f"1:{ratio:.1f}"
+    except (TypeError, ValueError):
+        return "N/A"
+
+
+def _build_invalidation_conditions(stop_loss: Any, decision_type: str) -> list:
+    """Build default invalidation conditions when LLM did not supply them."""
+    conditions = []
+    sl_str = str(stop_loss) if stop_loss not in (None, "N/A", "待补充", "") else None
+    if sl_str:
+        conditions.append(f"收盘跌破止损价 {sl_str}，本计划失效，须离场观望并重新评估")
+    else:
+        conditions.append("收盘跌破止损价（见 sniper_points.stop_loss），本计划失效")
+    if decision_type in ("buy",):
+        conditions.append("出现减持公告、监管立案或重大业绩预亏，立即止损离场")
+        conditions.append("大盘指数单日暴跌 >3%，降低仓位至半仓以下等待企稳")
+    elif decision_type in ("sell",):
+        conditions.append("价格收盘站上前期高点且放量，空头逻辑破坏，需重新评估")
+    else:
+        conditions.append("出现明显异动（放量大跌/大涨 >5%），重新评估方向")
+    return conditions
 
 
 def _first_non_empty_text(*values: Any) -> str:
