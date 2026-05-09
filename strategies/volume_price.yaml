@@ -1,0 +1,50 @@
+# 量价关系验证策略
+
+name: volume_price
+display_name: 量价关系验证
+description: 通过量价配合/背离判断趋势可信度，识别放量突破与缩量做空信号。
+category: volume
+required_tools:
+  - get_volume_analysis
+  - analyze_trend
+aliases: [量价, 量价关系, 成交量, 放量, 缩量]
+default_active: false
+market_regimes: [trending_up, trending_down, sideways]
+
+instructions: |
+  **量价关系验证策略（Volume-Price Relationship）**
+
+  适用场景：
+  - 验证趋势的真实性和持续性。
+  - 识别主力建仓/出货行为。
+
+  分析框架：
+
+  1. **获取量价数据**
+     - 使用 `get_volume_analysis` 获取近30日量价分析，重点关注：
+       - `pattern`：量价配合类型（配合良好/背离/中性等）
+       - `avg_up_day_volume` vs `avg_down_day_volume`：上涨日与下跌日的平均成交量对比
+       - `volume_trend`：近期量能趋势（放量/缩量/平稳）
+       - `volume_ratio_vs_5d`：当日量比（相对5日均量）
+
+  2. **量价配合评分**
+
+     | 情形 | 评分调整 | 含义 |
+     |------|---------|------|
+     | 量价配合良好（上涨放量、下跌缩量） | +10 | 趋势健康，主力参与 |
+     | 当日放量上涨（volume_ratio_vs_5d > 1.5 且价格上涨） | +8 | 买盘积极，短期动能强 |
+     | 量价关系中性 | 0 | 无明显异常 |
+     | 近期明显缩量（volume_ratio_vs_5d < 0.6） | -5 | 市场观望，等待放量确认 |
+     | 量价背离（下跌放量、上涨缩量） | -12 | 主力可能出货，谨慎看多 |
+     | 放量大跌（当日量比 > 2 且跌幅 > 3%） | -15 | 主力出货信号，看空 |
+
+  3. **关键判断规则**
+     - **最重要原则**：上涨必须有量配合，无量上涨不可信。
+     - 如果 `avg_up_day_volume` < `avg_down_day_volume`，即使价格在上涨，也要下调信心。
+     - 缩量整理（量能收缩 + 价格小幅波动）是健康调整，不等于看空。
+     - `volume_ratio_vs_20d` < 0.5 且持续多日，说明市场兴趣极低，避免操作。
+
+  4. **输出要点**
+     - 在 `reasoning` 中明确描述量价关系模式（用大白话，不要用"volume_ratio"等指标代码）。
+     - 例如："近5日上涨时成交量明显放大，下跌时缩量，量价配合良好" 或
+             "今日价格上涨但成交量相比5日均量萎缩40%，量价背离，上涨可信度低"

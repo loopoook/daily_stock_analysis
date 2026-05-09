@@ -512,8 +512,152 @@ analyze_pattern_tool = ToolDefinition(
 )
 
 
+# ============================================================
+# analyze_weekly_trend — weekly timeframe validation
+# ============================================================
+
+def _handle_analyze_weekly_trend(stock_code: str) -> dict:
+    """Derive weekly K-line trend signals by resampling daily data."""
+    from src.services.history_loader import load_history_df
+    import pandas as pd
+
+    df, source = load_history_df(stock_code, days=300)
+
+    if df is None or df.empty:
+        return {"error": f"No historical data for {stock_code}"}
+
+    df = df.copy()
+
+    # Ensure datetime index
+    if "date" in df.columns:
+        df["date"] = pd.to_datetime(df["date"])
+        df = df.set_index("date").sort_index()
+    else:
+        df.index = pd.to_datetime(df.index)
+        df = df.sort_index()
+
+    required = {"open", "high", "low", "close"}
+    if not required.issubset(set(df.columns)):
+        return {"error": f"Missing OHLC columns for {stock_code}"}
+
+    vol_col = "volume" if "volume" in df.columns else None
+    agg = {"open": "first", "high": "max", "low": "min", "close": "last"}
+    if vol_col:
+        agg["volume"] = "sum"
+
+    weekly = df.resample("W-FRI").agg(agg).dropna(subset=["close"])
+
+    if len(weekly) < 10:
+        return {"error": f"Insufficient weekly data for {stock_code} (only {len(weekly)} weeks)"}
+
+    close = weekly["close"]
+    current_price = float(close.iloc[-1])
+
+    # Weekly MAs
+    ma5w = float(close.rolling(5).mean().iloc[-1]) if len(close) >= 5 else None
+    ma10w = float(close.rolling(10).mean().iloc[-1]) if len(close) >= 10 else None
+    ma20w = float(close.rolling(20).mean().iloc[-1]) if len(close) >= 20 else None
+
+    # MA alignment
+    ma_values = [v for v in [ma5w, ma10w, ma20w] if v is not None]
+    above_count = sum(1 for v in ma_values if current_price > v)
+    total_mas = len(ma_values)
+
+    if total_mas == 0:
+        weekly_ma_alignment = "数据不足"
+        is_weekly_bullish = None
+    elif above_count == total_mas:
+        weekly_ma_alignment = "多头排列"
+        is_weekly_bullish = True
+    elif above_count == 0:
+        weekly_ma_alignment = "空头排列"
+        is_weekly_bullish = False
+    else:
+        weekly_ma_alignment = f"混合({above_count}/{total_mas}均线上方)"
+        is_weekly_bullish = above_count > total_mas / 2
+
+    # Weekly RSI-14
+    delta = close.diff()
+    avg_gain = delta.clip(lower=0).rolling(14).mean()
+    avg_loss = (-delta.clip(upper=0)).rolling(14).mean()
+    rs = avg_gain / avg_loss.replace(0, float("inf"))
+    rsi_series = 100 - (100 / (1 + rs))
+    rsi_val = rsi_series.iloc[-1]
+    weekly_rsi = float(rsi_val) if pd.notna(rsi_val) else None
+
+    # Weekly MACD (12, 26, 9)
+    ema12 = close.ewm(span=12, adjust=False).mean()
+    ema26 = close.ewm(span=26, adjust=False).mean()
+    dif = ema12 - ema26
+    dea = dif.ewm(span=9, adjust=False).mean()
+    weekly_dif = float(dif.iloc[-1])
+    weekly_dea = float(dea.iloc[-1])
+    weekly_macd_golden = weekly_dif > weekly_dea
+
+    # 5-week price change
+    trend_pct = None
+    if len(close) >= 6:
+        trend_pct = round(
+            (float(close.iloc[-1]) - float(close.iloc[-6])) / float(close.iloc[-6]) * 100, 1
+        )
+
+    # Plain-language summary
+    rsi_desc = ""
+    if weekly_rsi is not None:
+        if weekly_rsi > 70:
+            rsi_desc = "，周RSI超买区"
+        elif weekly_rsi < 30:
+            rsi_desc = "，周RSI超卖区（关注反弹）"
+
+    macd_cross = "MACD金叉" if weekly_macd_golden else "MACD死叉"
+
+    if is_weekly_bullish is True:
+        summary = f"周线{weekly_ma_alignment}，{macd_cross}{rsi_desc}，中期趋势向上"
+    elif is_weekly_bullish is False:
+        summary = f"周线{weekly_ma_alignment}，{macd_cross}{rsi_desc}，中期趋势向下"
+    else:
+        summary = f"周线数据不足，{macd_cross}{rsi_desc}，暂无明确中期趋势判断"
+
+    return {
+        "code": stock_code,
+        "source": source,
+        "weekly_bars": len(weekly),
+        "current_price": round(current_price, 2),
+        "ma5_weekly": round(ma5w, 2) if ma5w is not None else None,
+        "ma10_weekly": round(ma10w, 2) if ma10w is not None else None,
+        "ma20_weekly": round(ma20w, 2) if ma20w is not None else None,
+        "weekly_ma_alignment": weekly_ma_alignment,
+        "is_weekly_bullish": is_weekly_bullish,
+        "weekly_rsi": round(weekly_rsi, 1) if weekly_rsi is not None else None,
+        "weekly_macd_golden_cross": weekly_macd_golden,
+        "weekly_dif": round(weekly_dif, 4),
+        "weekly_dea": round(weekly_dea, 4),
+        "weekly_trend_pct_5w": trend_pct,
+        "weekly_summary": summary,
+    }
+
+
+analyze_weekly_trend_tool = ToolDefinition(
+    name="analyze_weekly_trend",
+    description="Derive weekly K-line trend signals by resampling daily data into weekly bars. "
+                "Returns weekly MA alignment (multi-head/bearish/mixed), RSI, MACD golden/dead "
+                "cross, and a plain-Chinese summary. Use to validate whether the daily signal "
+                "aligns with the medium-term weekly trend. Always call this alongside analyze_trend.",
+    parameters=[
+        ToolParameter(
+            name="stock_code",
+            type="string",
+            description="Stock code, e.g., '600519'",
+        ),
+    ],
+    handler=_handle_analyze_weekly_trend,
+    category="analysis",
+)
+
+
 ALL_ANALYSIS_TOOLS = [
     analyze_trend_tool,
+    analyze_weekly_trend_tool,
     calculate_ma_tool,
     get_volume_analysis_tool,
     analyze_pattern_tool,

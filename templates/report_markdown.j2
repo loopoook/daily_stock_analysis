@@ -82,6 +82,9 @@
 |------|------|------|
 {% if trend_data %}
 | {{ labels.bullish_alignment_label }} | {{ '✅ 是' if trend_data.get('is_bullish') else '❌ 否' }} | {{ labels.trend_strength_label }} {{ trend_data.get('trend_score', 'N/A') }}/100 |
+{% if trend_data.get('weekly_trend') %}
+| {{ labels.weekly_trend_label }} | {{ trend_data.weekly_trend }} | 周线方向，日线信号验证 |
+{% endif %}
 {% endif %}
 {% if price_data %}
 | {{ labels.current_price_label }} | **{{ price_data.get('current_price', 'N/A') }}** | {{ labels.support_level_label }} {{ price_data.get('support_level', 'N/A') }} / {{ labels.resistance_level_label }} {{ price_data.get('resistance_level', 'N/A') }} |

@@ -1003,6 +1003,21 @@ class AgentOrchestrator:
         if data_perspective:
             dashboard_block["data_perspective"] = data_perspective
 
+        # Inject weekly_trend from TechnicalAgent raw_data (deterministic override)
+        _tech_op = self._latest_opinion(ctx, {"technical"})
+        _tech_raw_wt = _tech_op.raw_data if _tech_op and isinstance(_tech_op.raw_data, dict) else {}
+        _weekly_trend = _tech_raw_wt.get("weekly_trend")
+        if _weekly_trend:
+            _dp = dashboard_block.get("data_perspective")
+            if not isinstance(_dp, dict):
+                _dp = {}
+                dashboard_block["data_perspective"] = _dp
+            _ts = _dp.get("trend_status")
+            if not isinstance(_ts, dict):
+                _ts = {}
+                _dp["trend_status"] = _ts
+            _ts["weekly_trend"] = _weekly_trend
+
         dashboard_block["core_conclusion"] = core
         dashboard_block["intelligence"] = intelligence
         dashboard_block["battle_plan"] = battle
@@ -1076,12 +1091,16 @@ class AgentOrchestrator:
         data_perspective: Dict[str, Any] = {}
         ma_alignment = tech_raw.get("ma_alignment")
         trend_score = tech_raw.get("trend_score")
-        if ma_alignment or trend_score is not None:
-            data_perspective["trend_status"] = {
+        weekly_trend = tech_raw.get("weekly_trend")
+        if ma_alignment or trend_score is not None or weekly_trend:
+            trend_status: Dict[str, Any] = {
                 "ma_alignment": ma_alignment or "N/A",
                 "trend_score": trend_score if trend_score is not None else "N/A",
                 "is_bullish": str(ma_alignment).lower() == "bullish",
             }
+            if weekly_trend:
+                trend_status["weekly_trend"] = weekly_trend
+            data_perspective["trend_status"] = trend_status
 
         def _bias_label(bias):
             if not isinstance(bias, (int, float)):

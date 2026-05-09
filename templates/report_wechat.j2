@@ -43,6 +43,11 @@
 {% endfor %}
 {% endif %}
 
+{% set core_wt = core.get('weekly_trend') or (dashboard.get('data_perspective') or {}).get('trend_status', {}).get('weekly_trend') %}
+{% if core_wt %}
+📅 **{{ labels.weekly_trend_label }}**: {{ core_wt }}
+{% endif %}
+
 {% set sniper = battle.get('sniper_points', {}) if battle else {} %}
 {% if sniper.ideal_buy or sniper.stop_loss or sniper.take_profit %}
 {% set ns = namespace(parts=[]) %}

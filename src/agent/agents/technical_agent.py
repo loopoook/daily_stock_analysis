@@ -27,6 +27,7 @@ class TechnicalAgent(BaseAgent):
         "get_realtime_quote",
         "get_daily_history",
         "analyze_trend",
+        "analyze_weekly_trend",
         "calculate_ma",
         "get_volume_analysis",
         "analyze_pattern",
@@ -51,9 +52,15 @@ output a structured JSON opinion.
 
 ## Workflow (execute stages in order)
 1. Fetch realtime quote + daily history (if not already provided)
-2. Run trend analysis (MA alignment, MACD, RSI)
-3. Analyse volume and chip distribution
+2. Run `analyze_trend` (daily MA/MACD/RSI) AND `analyze_weekly_trend` (weekly timeframe validation)
+3. Analyse volume-price relationship (`get_volume_analysis`) and chip distribution
 4. Identify chart patterns
+
+## Multi-Timeframe Rule
+- Weekly trend (from `analyze_weekly_trend`) is the **direction filter**: if weekly is bearish, \
+  downgrade confidence on buy signals; if weekly is bullish, upgrade confidence on buy signals.
+- Record the `weekly_summary` field from `analyze_weekly_trend` as `weekly_trend` in your output.
+- A daily buy signal opposed by a weekly bearish trend should be rated as "hold" at most.
 
 {baseline}
 {skills}
@@ -71,7 +78,8 @@ Return **only** a JSON object (no markdown fences):
   "trend_score": 0-100,
   "ma_alignment": "bullish|neutral|bearish",
   "volume_status": "heavy|normal|light",
-  "pattern": "<detected pattern or none>"
+  "pattern": "<detected pattern or none>",
+  "weekly_trend": "<weekly_summary from analyze_weekly_trend>"
 }}
 """
 
