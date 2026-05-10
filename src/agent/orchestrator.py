@@ -1046,6 +1046,8 @@ class AgentOrchestrator:
                 _ts_mt = {}
                 _dp_mt["trend_status"] = _ts_mt
             _ts_mt["monthly_trend"] = _monthly_trend
+        else:
+            logger.debug("[Orchestrator] monthly_trend unavailable after fallback")
 
         # Fill volume_ratio / turnover_rate from realtime_quote when LLM left them blank
         _rq = ctx.get_data("realtime_quote") or {}
@@ -1086,7 +1088,7 @@ class AgentOrchestrator:
         payload["stock_name"] = _first_non_empty_text(payload.get("stock_name"), ctx.stock_name, ctx.stock_code)
         # --- Northbound score weighting ---
         _intel_op = self._latest_opinion(ctx, {"intel"})
-        _intel_raw = _intel_op.raw_data if _intel_op and isinstance(getattr(_intel_op, "raw_data", None), dict) else {}
+        _intel_raw = _intel_op.raw_data if _intel_op and isinstance(_intel_op.raw_data, dict) else {}
         _nb_delta = _intel_raw.get("northbound_score_delta")
         if _nb_delta is None:
             try:
@@ -1096,8 +1098,13 @@ class AgentOrchestrator:
             except Exception as _nb_err:
                 logger.debug("[Orchestrator] northbound fallback failed: %s", _nb_err)
                 _nb_delta = 0
-        if _nb_delta:
-            sentiment_score = max(0, min(100, sentiment_score + int(_nb_delta)))
+        try:
+            _nb_int = int(_nb_delta)
+        except (TypeError, ValueError):
+            logger.debug("[Orchestrator] northbound_score_delta invalid type: %r, skipping", _nb_delta)
+            _nb_int = 0
+        if _nb_int:
+            sentiment_score = max(0, min(100, sentiment_score + _nb_int))
             logger.debug("[Orchestrator] northbound score_delta=%s → adjusted sentiment_score=%s", _nb_delta, sentiment_score)
         payload["sentiment_score"] = sentiment_score
         payload["trend_prediction"] = trend_prediction
