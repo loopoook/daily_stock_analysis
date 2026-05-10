@@ -6,10 +6,10 @@ from unittest.mock import patch
 
 
 def _make_flow_df(net_buy_sh: float, net_buy_sz: float) -> pd.DataFrame:
-    """Synthetic northbound flow summary DataFrame."""
+    """Synthetic northbound flow summary DataFrame using real API column names."""
     return pd.DataFrame([
-        {"日期": "2026-05-09", "市场": "沪股通", "资金净买": net_buy_sh, "资金净流入": net_buy_sh * 0.8},
-        {"日期": "2026-05-09", "市场": "深股通", "资金净买": net_buy_sz, "资金净流入": net_buy_sz * 0.8},
+        {"交易日": "2026-05-09", "板块": "沪股通(港)", "成交净买额": net_buy_sh, "资金净流入": net_buy_sh * 0.8},
+        {"交易日": "2026-05-09", "板块": "深股通(港)", "成交净买额": net_buy_sz, "资金净流入": net_buy_sz * 0.8},
     ])
 
 
@@ -20,7 +20,7 @@ class TestGetNorthboundFlow:
         df = _make_flow_df(25.0, 20.0)  # total 45 亿
         with patch("src.agent.tools.data_tools._fetch_northbound_df", return_value=df):
             result = _handle_get_northbound_flow()
-        assert result["signal"] in ("strong_inflow", "inflow")
+        assert result["signal"] == "strong_inflow"
         assert result["net_total_billion"] > 0
 
     def test_outflow_returns_negative_signal(self):
@@ -29,7 +29,7 @@ class TestGetNorthboundFlow:
         df = _make_flow_df(-15.0, -10.0)
         with patch("src.agent.tools.data_tools._fetch_northbound_df", return_value=df):
             result = _handle_get_northbound_flow()
-        assert result["signal"] in ("outflow", "strong_outflow")
+        assert result["signal"] == "outflow"
         assert result["net_total_billion"] < 0
 
     def test_score_delta_within_range(self):
@@ -38,7 +38,7 @@ class TestGetNorthboundFlow:
         df = _make_flow_df(50.0, 30.0)  # very strong inflow
         with patch("src.agent.tools.data_tools._fetch_northbound_df", return_value=df):
             result = _handle_get_northbound_flow()
-        assert -5 <= result["score_delta"] <= 5
+        assert result["score_delta"] == 5
 
     def test_api_failure_returns_not_available(self):
         """akshare failure → status=not_available, no exception raised."""

@@ -729,8 +729,9 @@ def _handle_get_northbound_flow() -> dict:
                 "note": "北向资金数据暂不可用"}
 
     # Column name normalisation — akshare returns Chinese column names
+    # 注意：「资金净流入」是当日剩余额度（约420亿），不是净买入金额，不应使用
     net_col = None
-    for candidate in ["资金净买", "净买额", "资金净流入", "净流入"]:
+    for candidate in ["成交净买额", "净买额", "净流入"]:
         if candidate in df.columns:
             net_col = candidate
             break
@@ -738,6 +739,10 @@ def _handle_get_northbound_flow() -> dict:
     if net_col is None:
         return {"status": "not_available", "score_delta": 0,
                 "note": "北向资金数据列名无法识别"}
+
+    if df[net_col].isna().all():
+        return {"status": "not_available", "score_delta": 0,
+                "note": "北向资金数据全为空值"}
 
     try:
         net_total = float(df[net_col].sum())  # 单位：亿元
