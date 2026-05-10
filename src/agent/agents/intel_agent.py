@@ -29,6 +29,7 @@ class IntelAgent(BaseAgent):
         "search_comprehensive_intel",
         "get_stock_info",
         "get_capital_flow",
+        "get_northbound_flow",   # 新增
     ]
 
     def system_prompt(self, ctx: AgentContext) -> str:
@@ -45,8 +46,10 @@ the given stock, then produce a structured JSON opinion.
 announcements (公司公告), market analysis, risk checks, and earnings outlook
 3. For A-share stocks, call get_capital_flow to obtain main-force (主力) \
 capital inflow/outflow data and include it in your analysis
-4. Classify positive catalysts and risk alerts
-5. Assess overall sentiment
+4. Call `get_northbound_flow` to get today's market-level northbound net buy (北向净买入).
+Note the `score_delta` it returns — this feeds directly into the final sentiment score weighting.
+5. Classify positive catalysts and risk alerts
+6. Assess overall sentiment
 
 ## Risk Detection Priorities
 - Insider / major shareholder sell-downs (减持)
@@ -56,6 +59,14 @@ capital inflow/outflow data and include it in your analysis
 - Large lock-up expirations (解禁)
 - PE valuation anomalies
 - Sustained main-force capital outflow (主力持续净流出)
+
+## Northbound Flow Interpretation
+- signal=strong_inflow (net > +30亿): strong positive market background, upgrade confidence
+- signal=inflow (net +10~30亿): mildly positive background
+- signal=neutral: no market-level tailwind or headwind
+- signal=outflow / strong_outflow: foreign capital retreating, downgrade confidence on buy signals
+- Always report the `summary` field verbatim in your reasoning.
+- If status=not_available, skip northbound analysis entirely.
 
 ## Capital Flow Interpretation (A-shares only)
 - main_net_inflow > 0: bullish signal (主力净流入)
@@ -72,6 +83,8 @@ Return **only** a JSON object:
   "positive_catalysts": ["list", "of", "catalysts"],
   "sentiment_label": "very_positive|positive|neutral|negative|very_negative",
   "capital_flow_signal": "inflow|outflow|neutral|not_available",
+  "northbound_signal": "strong_inflow|inflow|neutral|outflow|strong_outflow|not_available",
+  "northbound_score_delta": 0,
   "key_news": [
     {"title": "...", "impact": "positive|negative|neutral"}
   ]
