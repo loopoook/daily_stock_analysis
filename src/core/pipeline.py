@@ -1060,6 +1060,7 @@ class StockAnalysisPipeline:
             # methods (get_sniper_points, get_core_conclusion, etc.) expect that inner
             # structure, so we unwrap it here.
             result.dashboard = nested_dashboard or dash
+            self._inject_weekly_monthly_northbound(result, code)
             self._backfill_agent_dashboard_fields(result, trend_result, report_language)
         else:
             self._apply_trend_fallback(result, trend_result, report_language)
@@ -1073,6 +1074,72 @@ class StockAnalysisPipeline:
                 result.error_message = "Agent failed to generate a valid decision dashboard" if report_language == "en" else "Agent 未能生成有效的决策仪表盘"
 
         return result
+
+    def _inject_weekly_monthly_northbound(self, result: "AnalysisResult", stock_code: str) -> None:
+        """Inject weekly trend, monthly trend, and northbound data for single-agent mode.
+
+        In multi-agent mode this is handled by AgentOrchestrator._normalize_dashboard_payload.
+        In single-agent mode the dashboard is set directly from AgentExecutor output, so we
+        inject here after result.dashboard is assigned.  Historical data is already cached in
+        the DB at this point, so the tool calls return quickly.
+        """
+        if not isinstance(result.dashboard, dict):
+            return
+        db = result.dashboard
+
+        _dp = db.get("data_perspective")
+        if not isinstance(_dp, dict):
+            _dp = {}
+            db["data_perspective"] = _dp
+        _ts = _dp.get("trend_status")
+        if not isinstance(_ts, dict):
+            _ts = {}
+            _dp["trend_status"] = _ts
+
+        if not _ts.get("weekly_trend") and stock_code:
+            try:
+                from src.agent.tools.analysis_tools import _handle_analyze_weekly_trend
+                wt = _handle_analyze_weekly_trend(stock_code)
+                if isinstance(wt, dict) and not wt.get("error"):
+                    val = wt.get("weekly_summary", "")
+                    if val:
+                        _ts["weekly_trend"] = val
+                        logger.info("[Pipeline] weekly_trend injected for %s: %.60s", stock_code, val)
+            except Exception as _e:
+                logger.warning("[Pipeline] weekly_trend injection failed for %s: %s", stock_code, _e)
+
+        if not _ts.get("monthly_trend") and stock_code:
+            try:
+                from src.agent.tools.analysis_tools import _handle_analyze_monthly_trend
+                mt = _handle_analyze_monthly_trend(stock_code)
+                if isinstance(mt, dict) and not mt.get("error"):
+                    val = mt.get("monthly_summary", "")
+                    if val:
+                        _ts["monthly_trend"] = val
+                        logger.info("[Pipeline] monthly_trend injected for %s: %.60s", stock_code, val)
+            except Exception as _e:
+                logger.warning("[Pipeline] monthly_trend injection failed for %s: %s", stock_code, _e)
+
+        _intel = db.get("intelligence")
+        if not isinstance(_intel, dict):
+            _intel = {}
+            db["intelligence"] = _intel
+        if not _intel.get("northbound_summary"):
+            try:
+                from src.agent.tools.data_tools import _handle_get_northbound_flow
+                nb = _handle_get_northbound_flow()
+                if isinstance(nb, dict) and nb.get("status") == "available":
+                    summary = nb.get("summary", "")
+                    signal = nb.get("signal", "")
+                    if summary:
+                        _intel["northbound_summary"] = summary
+                    if signal:
+                        _intel["northbound_signal"] = signal
+                    logger.info("[Pipeline] northbound injected: signal=%s, summary=%.60s", signal, summary)
+                else:
+                    logger.warning("[Pipeline] northbound unavailable: status=%s", nb.get("status") if isinstance(nb, dict) else "exception")
+            except Exception as _e:
+                logger.warning("[Pipeline] northbound injection failed: %s", _e)
 
     @staticmethod
     def _agent_dashboard_value(

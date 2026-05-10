@@ -9,6 +9,7 @@
 2. 搜索市场新闻形成复盘情报
 3. 使用大模型生成每日大盘复盘报告
 """
+from __future__ import annotations
 
 import logging
 import time
