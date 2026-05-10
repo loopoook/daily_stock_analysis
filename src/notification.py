@@ -927,6 +927,10 @@ class NotificationService(
                     if intel.get('latest_news'):
                         report_lines.append("")
                         report_lines.append(f"**📢 {labels['latest_news_label']}**: {intel['latest_news']}")
+                    # 北向资金
+                    if intel.get('northbound_summary'):
+                        report_lines.append("")
+                        report_lines.append(f"**🌐 {labels.get('northbound_label', '北向资金')}**: {intel['northbound_summary']}")
                     report_lines.append("")
                 
                 # ========== 核心结论 ==========
@@ -982,6 +986,17 @@ class NotificationService(
                             f"{labels['trend_strength_label']}: {trend_data.get('trend_score', 'N/A')}/100",
                             "",
                         ])
+                        # 周线/月线趋势
+                        if trend_data.get('weekly_trend'):
+                            report_lines.append(
+                                f"**{labels.get('weekly_trend_label', '周线趋势')}**: {trend_data['weekly_trend']}"
+                            )
+                        if trend_data.get('monthly_trend'):
+                            report_lines.append(
+                                f"**{labels.get('monthly_trend_label', '月线趋势')}**: {trend_data['monthly_trend']}"
+                            )
+                        if trend_data.get('weekly_trend') or trend_data.get('monthly_trend'):
+                            report_lines.append("")
                     # 价格位置
                     if price_data:
                         bias_status = price_data.get('bias_status', 'N/A')
