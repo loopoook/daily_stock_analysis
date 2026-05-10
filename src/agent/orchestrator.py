@@ -1086,18 +1086,28 @@ class AgentOrchestrator:
             risk_warning = "暂无额外风险提示"
 
         payload["stock_name"] = _first_non_empty_text(payload.get("stock_name"), ctx.stock_name, ctx.stock_code)
-        # --- Northbound score weighting ---
+        # --- Northbound score weighting + report injection ---
         _intel_op = self._latest_opinion(ctx, {"intel"})
         _intel_raw = _intel_op.raw_data if _intel_op and isinstance(_intel_op.raw_data, dict) else {}
         _nb_delta = _intel_raw.get("northbound_score_delta")
+        _nb_signal = _intel_raw.get("northbound_signal")
+        _nb_summary = None
+        _nb_result = None
         if _nb_delta is None:
             try:
                 from src.agent.tools.data_tools import _handle_get_northbound_flow
                 _nb_result = _handle_get_northbound_flow()
-                _nb_delta = _nb_result.get("score_delta", 0) if _nb_result.get("status") == "available" else 0
+                if _nb_result.get("status") == "available":
+                    _nb_delta = _nb_result.get("score_delta", 0)
+                    _nb_signal = _nb_result.get("signal")
+                    _nb_summary = _nb_result.get("summary")
+                else:
+                    _nb_delta = 0
             except Exception as _nb_err:
                 logger.debug("[Orchestrator] northbound fallback failed: %s", _nb_err)
                 _nb_delta = 0
+        if not _nb_summary and _nb_result and _nb_result.get("status") == "available":
+            _nb_summary = _nb_result.get("summary")
         try:
             _nb_int = int(_nb_delta)
         except (TypeError, ValueError):
@@ -1106,6 +1116,16 @@ class AgentOrchestrator:
         if _nb_int:
             sentiment_score = max(0, min(100, sentiment_score + _nb_int))
             logger.debug("[Orchestrator] northbound score_delta=%s → adjusted sentiment_score=%s", _nb_delta, sentiment_score)
+        # Inject northbound summary into dashboard['intelligence'] for report rendering
+        if _nb_summary or _nb_signal:
+            _intel_block = dashboard_block.get("intelligence")
+            if not isinstance(_intel_block, dict):
+                _intel_block = {}
+                dashboard_block["intelligence"] = _intel_block
+            if _nb_summary:
+                _intel_block["northbound_summary"] = _nb_summary
+            if _nb_signal:
+                _intel_block["northbound_signal"] = _nb_signal
         payload["sentiment_score"] = sentiment_score
         payload["trend_prediction"] = trend_prediction
         payload["operation_advice"] = operation_advice

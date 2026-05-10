@@ -28,6 +28,9 @@
 {% if intel.get('sentiment_summary') %}
 💭 {{ labels.sentiment_summary_label }}: {{ intel.sentiment_summary[:50] }}
 {% endif %}
+{% if intel.get('northbound_summary') %}
+🌐 **{{ labels.northbound_label }}**: {{ intel.northbound_summary[:60] }}
+{% endif %}
 
 {% if intel.get('risk_alerts') %}
 🚨 **{{ labels.risk_alerts_label }}**:

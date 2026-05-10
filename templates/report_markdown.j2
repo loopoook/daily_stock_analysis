@@ -48,6 +48,10 @@
 
 **📢 {{ labels.latest_news_label }}**: {{ intel.latest_news }}
 {% endif %}
+{% if intel.get('northbound_summary') %}
+
+**🌐 {{ labels.northbound_label }}**: {{ intel.northbound_summary }}
+{% endif %}
 
 {% endif %}
 
