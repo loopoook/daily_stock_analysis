@@ -1007,6 +1007,14 @@ class AgentOrchestrator:
         _tech_op = self._latest_opinion(ctx, {"technical"})
         _tech_raw_wt = _tech_op.raw_data if _tech_op and isinstance(_tech_op.raw_data, dict) else {}
         _weekly_trend = _tech_raw_wt.get("weekly_trend")
+        if not _weekly_trend and ctx.stock_code:
+            # Fallback: TechnicalAgent skipped analyze_weekly_trend — compute deterministically
+            try:
+                from src.agent.tools.analysis_tools import _handle_analyze_weekly_trend
+                _wt_result = _handle_analyze_weekly_trend(ctx.stock_code)
+                _weekly_trend = _wt_result.get("weekly_summary", "") if isinstance(_wt_result, dict) else ""
+            except Exception as _wt_err:
+                logger.debug("[Orchestrator] weekly_trend fallback failed: %s", _wt_err)
         if _weekly_trend:
             _dp = dashboard_block.get("data_perspective")
             if not isinstance(_dp, dict):
@@ -1017,6 +1025,43 @@ class AgentOrchestrator:
                 _ts = {}
                 _dp["trend_status"] = _ts
             _ts["weekly_trend"] = _weekly_trend
+
+        # --- Monthly trend fallback injection ---
+        _monthly_trend = _tech_raw_wt.get("monthly_trend") if isinstance(_tech_raw_wt, dict) else None
+        if not _monthly_trend and ctx.stock_code:
+            try:
+                from src.agent.tools.analysis_tools import _handle_analyze_monthly_trend
+                _mt_result = _handle_analyze_monthly_trend(ctx.stock_code)
+                if isinstance(_mt_result, dict) and not _mt_result.get("error"):
+                    _monthly_trend = _mt_result.get("monthly_summary", "")
+            except Exception as _mt_err:
+                logger.debug("[Orchestrator] monthly_trend fallback failed: %s", _mt_err)
+        if _monthly_trend:
+            _dp_mt = dashboard_block.get("data_perspective")
+            if not isinstance(_dp_mt, dict):
+                _dp_mt = {}
+                dashboard_block["data_perspective"] = _dp_mt
+            _ts_mt = _dp_mt.get("trend_status")
+            if not isinstance(_ts_mt, dict):
+                _ts_mt = {}
+                _dp_mt["trend_status"] = _ts_mt
+            _ts_mt["monthly_trend"] = _monthly_trend
+
+        # Fill volume_ratio / turnover_rate from realtime_quote when LLM left them blank
+        _rq = ctx.get_data("realtime_quote") or {}
+        _rq_vr = _rq.get("volume_ratio")
+        _rq_tr = _rq.get("turnover_rate")
+        if _rq_vr is not None or _rq_tr is not None:
+            _dp_va = dashboard_block.get("data_perspective")
+            if isinstance(_dp_va, dict):
+                _va = _dp_va.get("volume_analysis")
+                if not isinstance(_va, dict):
+                    _va = {}
+                    _dp_va["volume_analysis"] = _va
+                if _rq_vr is not None and _va.get("volume_ratio") in (None, "N/A", ""):
+                    _va["volume_ratio"] = _rq_vr
+                if _rq_tr is not None and _va.get("turnover_rate") in (None, "N/A", ""):
+                    _va["turnover_rate"] = _rq_tr
 
         dashboard_block["core_conclusion"] = core
         dashboard_block["intelligence"] = intelligence
@@ -1039,6 +1084,21 @@ class AgentOrchestrator:
             risk_warning = "暂无额外风险提示"
 
         payload["stock_name"] = _first_non_empty_text(payload.get("stock_name"), ctx.stock_name, ctx.stock_code)
+        # --- Northbound score weighting ---
+        _intel_op = self._latest_opinion(ctx, {"intel"})
+        _intel_raw = _intel_op.raw_data if _intel_op and isinstance(getattr(_intel_op, "raw_data", None), dict) else {}
+        _nb_delta = _intel_raw.get("northbound_score_delta")
+        if _nb_delta is None:
+            try:
+                from src.agent.tools.data_tools import _handle_get_northbound_flow
+                _nb_result = _handle_get_northbound_flow()
+                _nb_delta = _nb_result.get("score_delta", 0) if _nb_result.get("status") == "available" else 0
+            except Exception as _nb_err:
+                logger.debug("[Orchestrator] northbound fallback failed: %s", _nb_err)
+                _nb_delta = 0
+        if _nb_delta:
+            sentiment_score = max(0, min(100, sentiment_score + int(_nb_delta)))
+            logger.debug("[Orchestrator] northbound score_delta=%s → adjusted sentiment_score=%s", _nb_delta, sentiment_score)
         payload["sentiment_score"] = sentiment_score
         payload["trend_prediction"] = trend_prediction
         payload["operation_advice"] = operation_advice
