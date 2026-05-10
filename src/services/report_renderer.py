@@ -94,7 +94,9 @@ def render(
         return None
 
     if report_date is None:
-        report_date = datetime.now().strftime("%Y-%m-%d")
+        from datetime import timezone, timedelta
+        _tz_cst = timezone(timedelta(hours=8))
+        report_date = datetime.now(_tz_cst).strftime("%Y-%m-%d")
 
     templates_dir = _resolve_templates_dir()
     template_name = f"report_{platform}.j2"
