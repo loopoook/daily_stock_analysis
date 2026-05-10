@@ -773,7 +773,10 @@ def _handle_get_northbound_flow() -> dict:
         f"市场情绪{'偏多' if net_total > 0 else '偏空'}"
     )
 
-    date_col = next((c for c in df.columns if "日期" in c or "date" in c.lower()), None)
+    date_col = next(
+        (c for c in df.columns if "日期" in c or "交易日" in c or "date" in c.lower()),
+        None,
+    )
     trade_date = str(df[date_col].iloc[0]) if date_col and len(df) > 0 else "unknown"
 
     return {

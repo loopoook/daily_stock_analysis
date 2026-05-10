@@ -8,8 +8,8 @@ from unittest.mock import patch
 def _make_flow_df(net_buy_sh: float, net_buy_sz: float) -> pd.DataFrame:
     """Synthetic northbound flow summary DataFrame using real API column names."""
     return pd.DataFrame([
-        {"交易日": "2026-05-09", "板块": "沪股通(港)", "成交净买额": net_buy_sh, "资金净流入": net_buy_sh * 0.8},
-        {"交易日": "2026-05-09", "板块": "深股通(港)", "成交净买额": net_buy_sz, "资金净流入": net_buy_sz * 0.8},
+        {"交易日": "2026-05-09", "板块": "沪股通(港)", "成交净买额": net_buy_sh},
+        {"交易日": "2026-05-09", "板块": "深股通(港)", "成交净买额": net_buy_sz},
     ])
 
 
