@@ -47,7 +47,7 @@
 {% if core_wt %}
 📅 **{{ labels.weekly_trend_label }}**: {{ core_wt }}
 {% endif %}
-{% set core_mt = (dashboard.get('data_perspective') or {}).get('trend_status', {}).get('monthly_trend') %}
+{% set core_mt = core.get('monthly_trend') or (dashboard.get('data_perspective') or {}).get('trend_status', {}).get('monthly_trend') %}
 {% if core_mt %}
 📆 **{{ labels.monthly_trend_label }}**: {{ core_mt }}
 {% endif %}
