@@ -655,9 +655,173 @@ analyze_weekly_trend_tool = ToolDefinition(
 )
 
 
+# ============================================================
+# analyze_monthly_trend — monthly timeframe validation
+# ============================================================
+
+def _load_df_for_monthly(stock_code: str):
+    """Load ≥3 years of daily history for monthly resampling."""
+    from src.services.history_loader import load_history_df
+    return load_history_df(stock_code, days=1500)
+
+
+def _handle_analyze_monthly_trend(stock_code: str) -> dict:
+    """Derive monthly K-line trend signals by resampling daily data.
+
+    Degradation policy:
+    - >= 36 monthly bars: full analysis with degraded=False
+    - 6-35 bars: analysis with degraded=True (data note appended to summary)
+    - < 6 bars: minimal summary only, sets degraded=True
+    - No data / missing columns: returns {"error": ...}
+    """
+    import pandas as pd
+
+    df, source = _load_df_for_monthly(stock_code)
+
+    if df is None or (hasattr(df, "empty") and df.empty):
+        return {"error": f"No historical data for {stock_code}"}
+
+    df = df.copy()
+    if "date" in df.columns:
+        df["date"] = pd.to_datetime(df["date"])
+        df = df.set_index("date").sort_index()
+    else:
+        df.index = pd.to_datetime(df.index)
+        df = df.sort_index()
+
+    required = {"open", "high", "low", "close"}
+    if not required.issubset(set(df.columns)):
+        return {"error": f"Missing OHLC columns for {stock_code}"}
+
+    agg = {"open": "first", "high": "max", "low": "min", "close": "last"}
+    if "volume" in df.columns:
+        agg["volume"] = "sum"
+
+    monthly = df.resample("ME").agg(agg).dropna(subset=["close"])
+    n_bars = len(monthly)
+    degraded = n_bars < 36
+
+    if n_bars < 6:
+        return {
+            "code": stock_code,
+            "monthly_bars": n_bars,
+            "degraded": True,
+            "monthly_summary": "月线数据不足6根，无法判断长期趋势",
+        }
+
+    close = monthly["close"]
+    current_price = float(close.iloc[-1])
+
+    # Monthly MAs (3/6/12 months)
+    ma3m = float(close.rolling(3).mean().iloc[-1]) if n_bars >= 3 else None
+    ma6m = float(close.rolling(6).mean().iloc[-1]) if n_bars >= 6 else None
+    ma12m = float(close.rolling(12).mean().iloc[-1]) if n_bars >= 12 else None
+
+    ma_values = [v for v in [ma3m, ma6m, ma12m] if v is not None]
+    above_count = sum(1 for v in ma_values if current_price > v)
+    total_mas = len(ma_values)
+
+    if total_mas == 0:
+        monthly_ma_alignment = "数据不足"
+        is_monthly_bullish = None
+    elif above_count == total_mas:
+        monthly_ma_alignment = "多头排列"
+        is_monthly_bullish = True
+    elif above_count == 0:
+        monthly_ma_alignment = "空头排列"
+        is_monthly_bullish = False
+    else:
+        monthly_ma_alignment = f"混合({above_count}/{total_mas}均线上方)"
+        is_monthly_bullish = above_count > total_mas / 2
+
+    # Monthly RSI-14
+    delta = close.diff()
+    avg_gain = delta.clip(lower=0).rolling(14).mean()
+    avg_loss = (-delta.clip(upper=0)).rolling(14).mean()
+    rs = avg_gain / avg_loss.replace(0, float("inf"))
+    rsi_series = 100 - (100 / (1 + rs))
+    rsi_val = rsi_series.iloc[-1]
+    monthly_rsi = float(rsi_val) if pd.notna(rsi_val) else None
+
+    # Monthly MACD (12, 26, 9)
+    ema12 = close.ewm(span=12, adjust=False).mean()
+    ema26 = close.ewm(span=26, adjust=False).mean()
+    dif = ema12 - ema26
+    dea = dif.ewm(span=9, adjust=False).mean()
+    monthly_dif = float(dif.iloc[-1])
+    monthly_dea = float(dea.iloc[-1])
+    monthly_macd_golden = monthly_dif > monthly_dea
+
+    # 6-month price change
+    trend_pct_6m = None
+    if n_bars >= 7:
+        trend_pct_6m = round(
+            (float(close.iloc[-1]) - float(close.iloc[-7])) / float(close.iloc[-7]) * 100, 1
+        )
+
+    # Plain-language summary
+    rsi_desc = ""
+    if monthly_rsi is not None:
+        if monthly_rsi > 70:
+            rsi_desc = "，月RSI超买区（长期高位）"
+        elif monthly_rsi < 30:
+            rsi_desc = "，月RSI超卖区（长期低位，关注价值回归）"
+
+    macd_cross = "MACD金叉" if monthly_macd_golden else "MACD死叉"
+    data_note = "（数据有限，仅供参考）" if degraded else ""
+
+    if is_monthly_bullish is True:
+        summary = f"月线{monthly_ma_alignment}，{macd_cross}{rsi_desc}，长期趋势向上{data_note}"
+    elif is_monthly_bullish is False:
+        summary = f"月线{monthly_ma_alignment}，{macd_cross}{rsi_desc}，长期趋势向下{data_note}"
+    else:
+        summary = f"月线数据有限，{macd_cross}{rsi_desc}，暂无明确长期趋势判断{data_note}"
+
+    return {
+        "code": stock_code,
+        "source": source,
+        "monthly_bars": n_bars,
+        "degraded": degraded,
+        "current_price": round(current_price, 2),
+        "ma3_monthly": round(ma3m, 2) if ma3m is not None else None,
+        "ma6_monthly": round(ma6m, 2) if ma6m is not None else None,
+        "ma12_monthly": round(ma12m, 2) if ma12m is not None else None,
+        "monthly_ma_alignment": monthly_ma_alignment,
+        "is_monthly_bullish": is_monthly_bullish,
+        "monthly_rsi": round(monthly_rsi, 1) if monthly_rsi is not None else None,
+        "monthly_macd_golden_cross": monthly_macd_golden,
+        "monthly_dif": round(monthly_dif, 4),
+        "monthly_dea": round(monthly_dea, 4),
+        "monthly_trend_pct_6m": trend_pct_6m,
+        "monthly_summary": summary,
+    }
+
+
+analyze_monthly_trend_tool = ToolDefinition(
+    name="analyze_monthly_trend",
+    description=(
+        "Derive monthly K-line trend signals by resampling daily data into monthly bars. "
+        "Returns monthly MA alignment (MA3/6/12), RSI, MACD golden/dead cross, and a "
+        "plain-Chinese summary. Use to validate the long-term trend direction. "
+        "Complements analyze_trend (daily) and analyze_weekly_trend (weekly) for "
+        "three-timeframe resonance analysis. Degrades gracefully when data < 36 months."
+    ),
+    parameters=[
+        ToolParameter(
+            name="stock_code",
+            type="string",
+            description="Stock code, e.g., '600519'",
+        ),
+    ],
+    handler=_handle_analyze_monthly_trend,
+    category="analysis",
+)
+
+
 ALL_ANALYSIS_TOOLS = [
     analyze_trend_tool,
     analyze_weekly_trend_tool,
+    analyze_monthly_trend_tool,
     calculate_ma_tool,
     get_volume_analysis_tool,
     analyze_pattern_tool,
