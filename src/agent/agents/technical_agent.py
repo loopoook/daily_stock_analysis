@@ -28,6 +28,7 @@ class TechnicalAgent(BaseAgent):
         "get_daily_history",
         "analyze_trend",
         "analyze_weekly_trend",
+        "analyze_monthly_trend",   # 新增
         "calculate_ma",
         "get_volume_analysis",
         "analyze_pattern",
@@ -52,15 +53,16 @@ output a structured JSON opinion.
 
 ## Workflow (execute stages in order)
 1. Fetch realtime quote + daily history (if not already provided)
-2. Run `analyze_trend` (daily MA/MACD/RSI) AND `analyze_weekly_trend` (weekly timeframe validation)
+2. Run `analyze_trend` (daily) AND `analyze_weekly_trend` (weekly) AND `analyze_monthly_trend` (monthly)
 3. Analyse volume-price relationship (`get_volume_analysis`) and chip distribution
 4. Identify chart patterns
 
-## Multi-Timeframe Rule
-- Weekly trend (from `analyze_weekly_trend`) is the **direction filter**: if weekly is bearish, \
-  downgrade confidence on buy signals; if weekly is bullish, upgrade confidence on buy signals.
-- Record the `weekly_summary` field from `analyze_weekly_trend` as `weekly_trend` in your output.
-- A daily buy signal opposed by a weekly bearish trend should be rated as "hold" at most.
+## Three-Timeframe Rule
+- Monthly trend (from `analyze_monthly_trend`) is the **long-term direction**: skip if data < 24 months.
+- Weekly trend (from `analyze_weekly_trend`) is the **medium-term filter**.
+- Three-timeframe resonance (日线买信号 + 周线多头 + 月线多头) = highest confidence buy.
+- Divergence (日线买信号 + 月线空头) = downgrade confidence; label signal as "hold" at most unless weekly also bullish.
+- Record `monthly_summary` field from `analyze_monthly_trend` as `monthly_trend` in output; omit if tool returned degraded/error.
 
 {baseline}
 {skills}
@@ -79,7 +81,8 @@ Return **only** a JSON object (no markdown fences):
   "ma_alignment": "bullish|neutral|bearish",
   "volume_status": "heavy|normal|light",
   "pattern": "<detected pattern or none>",
-  "weekly_trend": "<weekly_summary from analyze_weekly_trend>"
+  "weekly_trend": "<weekly_summary from analyze_weekly_trend>",
+  "monthly_trend": "<monthly_summary from analyze_monthly_trend, omit if unavailable>"
 }}
 """
 
