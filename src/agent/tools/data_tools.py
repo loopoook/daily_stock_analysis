@@ -699,3 +699,99 @@ get_capital_flow_tool = ToolDefinition(
 
 
 ALL_DATA_TOOLS.append(get_capital_flow_tool)
+
+
+# ============================================================
+# get_northbound_flow — daily market-level northbound net buy
+# ============================================================
+
+def _fetch_northbound_df():
+    """Fetch northbound fund flow summary via akshare."""
+    import akshare as ak
+    return ak.stock_hsgt_fund_flow_summary_em()
+
+
+def _handle_get_northbound_flow() -> dict:
+    """Get today's market-level northbound (沪深港通) net buy data.
+
+    Returns net inflow in 亿 CNY, a directional signal, and a score_delta
+    (-5 to +5) for sentiment_score weighting in the orchestrator.
+    """
+    try:
+        df = _fetch_northbound_df()
+    except Exception as exc:
+        logger.warning("get_northbound_flow: akshare fetch failed: %s", exc)
+        return {"status": "not_available", "score_delta": 0,
+                "note": f"北向资金数据获取失败: {exc}"}
+
+    if df is None or df.empty:
+        return {"status": "not_available", "score_delta": 0,
+                "note": "北向资金数据暂不可用"}
+
+    # Column name normalisation — akshare returns Chinese column names
+    net_col = None
+    for candidate in ["资金净买", "净买额", "资金净流入", "净流入"]:
+        if candidate in df.columns:
+            net_col = candidate
+            break
+
+    if net_col is None:
+        return {"status": "not_available", "score_delta": 0,
+                "note": "北向资金数据列名无法识别"}
+
+    try:
+        net_total = float(df[net_col].sum())  # 单位：亿元
+    except Exception:
+        return {"status": "not_available", "score_delta": 0,
+                "note": "北向资金数值解析失败"}
+
+    # Direction signal thresholds (亿元)
+    if net_total >= 30:
+        signal = "strong_inflow"
+        score_delta = 5
+    elif net_total >= 10:
+        signal = "inflow"
+        score_delta = 3
+    elif net_total >= -10:
+        signal = "neutral"
+        score_delta = 0
+    elif net_total >= -30:
+        signal = "outflow"
+        score_delta = -3
+    else:
+        signal = "strong_outflow"
+        score_delta = -5
+
+    direction_word = "净流入" if net_total >= 0 else "净流出"
+    summary = (
+        f"今日北向资金{direction_word} {abs(net_total):.1f} 亿元，"
+        f"市场情绪{'偏多' if net_total > 0 else '偏空'}"
+    )
+
+    date_col = next((c for c in df.columns if "日期" in c or "date" in c.lower()), None)
+    trade_date = str(df[date_col].iloc[0]) if date_col and len(df) > 0 else "unknown"
+
+    return {
+        "status": "available",
+        "trade_date": trade_date,
+        "net_total_billion": round(net_total, 2),
+        "signal": signal,
+        "score_delta": score_delta,
+        "summary": summary,
+    }
+
+
+get_northbound_flow_tool = ToolDefinition(
+    name="get_northbound_flow",
+    description=(
+        "Get today's market-level northbound fund (北向资金/沪深港通) net buy data. "
+        "Returns net inflow in 亿 CNY, directional signal (strong_inflow/inflow/neutral/"
+        "outflow/strong_outflow), and a score_delta (-5 to +5) for sentiment weighting. "
+        "Use as a market-sentiment background indicator. Always available for A-share analysis."
+    ),
+    parameters=[],
+    handler=_handle_get_northbound_flow,
+    category="data",
+)
+
+ALL_DATA_TOOLS.append(get_northbound_flow_tool)
