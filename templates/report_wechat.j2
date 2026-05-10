@@ -47,6 +47,14 @@
 {% if core_wt %}
 📅 **{{ labels.weekly_trend_label }}**: {{ core_wt }}
 {% endif %}
+{% set core_mt = (dashboard.get('data_perspective') or {}).get('trend_status', {}).get('monthly_trend') %}
+{% if core_mt %}
+📆 **{{ labels.monthly_trend_label }}**: {{ core_mt }}
+{% endif %}
+{% set _dp_vol = (dashboard.get('data_perspective') or {}).get('volume_analysis') or {} %}
+{% set _vr = _dp_vol.get('volume_ratio') %}{% if _vr is not none and _vr != 'N/A' %}
+📊 **{{ labels.volume_ratio_label }}**: {{ _vr }}（>1放量，>2强势放量）
+{% endif %}
 
 {% set sniper = battle.get('sniper_points', {}) if battle else {} %}
 {% if sniper.ideal_buy or sniper.stop_loss or sniper.take_profit %}

@@ -37,6 +37,7 @@ class TrendStatus(BaseModel):
     is_bullish: Optional[bool] = None
     trend_score: Optional[Union[int, float, str]] = None
     weekly_trend: Optional[str] = None
+    monthly_trend: Optional[str] = None
 
 
 class PricePosition(BaseModel):

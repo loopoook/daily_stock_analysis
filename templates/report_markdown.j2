@@ -85,6 +85,9 @@
 {% if trend_data.get('weekly_trend') %}
 | {{ labels.weekly_trend_label }} | {{ trend_data.weekly_trend }} | 周线方向，日线信号验证 |
 {% endif %}
+{% if trend_data.get('monthly_trend') %}
+| {{ labels.monthly_trend_label }} | {{ trend_data.monthly_trend }} | 月线方向，长期趋势验证 |
+{% endif %}
 {% endif %}
 {% if price_data %}
 | {{ labels.current_price_label }} | **{{ price_data.get('current_price', 'N/A') }}** | {{ labels.support_level_label }} {{ price_data.get('support_level', 'N/A') }} / {{ labels.resistance_level_label }} {{ price_data.get('resistance_level', 'N/A') }} |
@@ -92,7 +95,9 @@
 {% endif %}
 {% if vol_data %}
 | {{ labels.volume_label }} | {{ vol_data.get('volume_status', 'N/A') }} | {% if vol_data.get('volume_meaning') %}{{ vol_data.volume_meaning[:50] }}{% else %}换手率 {{ vol_data.get('turnover_rate', 'N/A') }}%{% endif %} |
-{% endif %}
+{% set _vr = vol_data.get('volume_ratio') %}{% if _vr is not none and _vr != 'N/A' %}
+| {{ labels.volume_ratio_label }} | **{{ _vr }}** | >1放量，>2强势放量，<0.5明显缩量 |
+{% endif %}{% endif %}
 {% if chip_data %}
 | {{ labels.chip_label }} | {{ localize_chip_health(chip_data.get('chip_health', 'N/A'), report_language) }} | {{ labels.chip_profit_label }} {{ chip_data.get('profit_ratio', 'N/A') }}，{{ labels.chip_cost_label }} {{ chip_data.get('avg_cost', 'N/A') }} |
 {% endif %}
