@@ -130,10 +130,10 @@ def _handle_analyze_monthly_trend(stock_code: str) -> dict:
     """Derive monthly K-line trend signals by resampling daily data.
 
     Degradation policy:
-    - >= 36 monthly bars: full analysis (MA3/6/12, RSI, MACD)
-    - 24-35 bars: partial analysis, sets degraded=True
-    - < 24 bars: minimal summary, sets degraded=True
-    - No data: returns {"error": ...}
+    - >= 36 monthly bars: full analysis with degraded=False
+    - 6-35 bars: analysis with degraded=True (data note appended to summary)
+    - < 6 bars: minimal summary only, sets degraded=True
+    - No data / missing columns: returns {"error": ...}
     """
     import pandas as pd
 
@@ -776,7 +776,16 @@ monthly_trend: Optional[str] = None
 {% endif %}
 ```
 
-北向净买入行已在上一版本新增（`volume_ratio` 修改时加入），无需重复添加；若未加则在此处补充。
+检查 `report_wechat.j2` 是否已有北向净买入行（形如 `_dp_vol.get('volume_ratio')`）。若没有，在月线行之后追加：
+
+```jinja2
+{% set _dp_vol = (dashboard.get('data_perspective') or {}).get('volume_analysis') or {} %}
+{% set _vr = _dp_vol.get('volume_ratio') %}{% if _vr is not none and _vr != 'N/A' %}
+📊 **{{ labels.volume_ratio_label }}**: {{ _vr }}（>1放量，>2强势放量）
+{% endif %}
+```
+
+无论是否已存在都需确认，避免缺失。
 
 - [ ] **Step 6.5：模板语法验证**
 
@@ -841,6 +850,8 @@ print('summary:', r.get('summary'))
 ```
 
 期望：返回 available 状态和数值，或在非交易日返回 not_available
+
+**关键验证**：确认返回的 DataFrame 中确实存在 `"资金净买"` 列名（或 `_handle_get_northbound_flow` 的列名解析逻辑能匹配到实际列名）。若列名不匹配，在 `_fetch_northbound_df` 之后加一行 `print(df.columns.tolist())` 查看实际列名，然后更新列名候选列表。
 
 - [ ] **Step 7.4：最终提交**
 
