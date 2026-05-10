@@ -1007,15 +1007,22 @@ class AgentOrchestrator:
         _tech_op = self._latest_opinion(ctx, {"technical"})
         _tech_raw_wt = _tech_op.raw_data if _tech_op and isinstance(_tech_op.raw_data, dict) else {}
         _weekly_trend = _tech_raw_wt.get("weekly_trend")
+        _weekly_source = "TechnicalAgent" if _weekly_trend else None
         if not _weekly_trend and ctx.stock_code:
             # Fallback: TechnicalAgent skipped analyze_weekly_trend — compute deterministically
             try:
                 from src.agent.tools.analysis_tools import _handle_analyze_weekly_trend
                 _wt_result = _handle_analyze_weekly_trend(ctx.stock_code)
-                _weekly_trend = _wt_result.get("weekly_summary", "") if isinstance(_wt_result, dict) else ""
+                if isinstance(_wt_result, dict) and not _wt_result.get("error"):
+                    _weekly_trend = _wt_result.get("weekly_summary", "")
+                    if _weekly_trend:
+                        _weekly_source = "fallback_tool"
+                elif isinstance(_wt_result, dict) and _wt_result.get("error"):
+                    logger.warning("[Orchestrator] weekly_trend fallback error: %s", _wt_result.get("error"))
             except Exception as _wt_err:
-                logger.debug("[Orchestrator] weekly_trend fallback failed: %s", _wt_err)
+                logger.warning("[Orchestrator] weekly_trend fallback failed: %s", _wt_err)
         if _weekly_trend:
+            logger.info("[Orchestrator] weekly_trend injected (source=%s): %.60s", _weekly_source, _weekly_trend)
             _dp = dashboard_block.get("data_perspective")
             if not isinstance(_dp, dict):
                 _dp = {}
@@ -1025,18 +1032,26 @@ class AgentOrchestrator:
                 _ts = {}
                 _dp["trend_status"] = _ts
             _ts["weekly_trend"] = _weekly_trend
+        else:
+            logger.warning("[Orchestrator] weekly_trend unavailable (TechnicalAgent=%r, fallback=failed)", _tech_raw_wt.get("weekly_trend"))
 
         # --- Monthly trend fallback injection ---
         _monthly_trend = _tech_raw_wt.get("monthly_trend") if isinstance(_tech_raw_wt, dict) else None
+        _monthly_source = "TechnicalAgent" if _monthly_trend else None
         if not _monthly_trend and ctx.stock_code:
             try:
                 from src.agent.tools.analysis_tools import _handle_analyze_monthly_trend
                 _mt_result = _handle_analyze_monthly_trend(ctx.stock_code)
                 if isinstance(_mt_result, dict) and not _mt_result.get("error"):
                     _monthly_trend = _mt_result.get("monthly_summary", "")
+                    if _monthly_trend:
+                        _monthly_source = "fallback_tool"
+                elif isinstance(_mt_result, dict) and _mt_result.get("error"):
+                    logger.warning("[Orchestrator] monthly_trend fallback error: %s", _mt_result.get("error"))
             except Exception as _mt_err:
-                logger.debug("[Orchestrator] monthly_trend fallback failed: %s", _mt_err)
+                logger.warning("[Orchestrator] monthly_trend fallback failed: %s", _mt_err)
         if _monthly_trend:
+            logger.info("[Orchestrator] monthly_trend injected (source=%s): %.60s", _monthly_source, _monthly_trend)
             _dp_mt = dashboard_block.get("data_perspective")
             if not isinstance(_dp_mt, dict):
                 _dp_mt = {}
@@ -1047,7 +1062,7 @@ class AgentOrchestrator:
                 _dp_mt["trend_status"] = _ts_mt
             _ts_mt["monthly_trend"] = _monthly_trend
         else:
-            logger.debug("[Orchestrator] monthly_trend unavailable after fallback")
+            logger.warning("[Orchestrator] monthly_trend unavailable after fallback")
 
         # Fill volume_ratio / turnover_rate from realtime_quote when LLM left them blank
         _rq = ctx.get_data("realtime_quote") or {}
@@ -1092,6 +1107,7 @@ class AgentOrchestrator:
         _nb_delta = _intel_raw.get("northbound_score_delta")
         _nb_signal = _intel_raw.get("northbound_signal")
         _nb_summary = None
+        _nb_result: dict = {}
         # Always fetch summary via tool (gives exact 亿 amount for report display).
         # Skip if IntelAgent already fetched and we only need the delta.
         try:
@@ -1106,7 +1122,7 @@ class AgentOrchestrator:
             elif _nb_delta is None:
                 _nb_delta = 0
         except Exception as _nb_err:
-            logger.debug("[Orchestrator] northbound fallback failed: %s", _nb_err)
+            logger.warning("[Orchestrator] northbound fallback failed: %s", _nb_err)
             if _nb_delta is None:
                 _nb_delta = 0
         # Fallback: construct summary from signal when tool call failed
@@ -1129,6 +1145,7 @@ class AgentOrchestrator:
             logger.debug("[Orchestrator] northbound score_delta=%s → adjusted sentiment_score=%s", _nb_delta, sentiment_score)
         # Inject northbound summary into dashboard['intelligence'] for report rendering
         if _nb_summary or _nb_signal:
+            logger.info("[Orchestrator] northbound injected: signal=%s, summary=%.60s", _nb_signal, _nb_summary or "(from signal fallback)")
             _intel_block = dashboard_block.get("intelligence")
             if not isinstance(_intel_block, dict):
                 _intel_block = {}
@@ -1137,6 +1154,8 @@ class AgentOrchestrator:
                 _intel_block["northbound_summary"] = _nb_summary
             if _nb_signal:
                 _intel_block["northbound_signal"] = _nb_signal
+        else:
+            logger.warning("[Orchestrator] northbound unavailable: status=%s, signal=%s", _nb_result.get("status", "exception"), _nb_signal)
         payload["sentiment_score"] = sentiment_score
         payload["trend_prediction"] = trend_prediction
         payload["operation_advice"] = operation_advice
