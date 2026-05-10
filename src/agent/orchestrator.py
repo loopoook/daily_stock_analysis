@@ -1092,22 +1092,33 @@ class AgentOrchestrator:
         _nb_delta = _intel_raw.get("northbound_score_delta")
         _nb_signal = _intel_raw.get("northbound_signal")
         _nb_summary = None
-        _nb_result = None
-        if _nb_delta is None:
-            try:
-                from src.agent.tools.data_tools import _handle_get_northbound_flow
-                _nb_result = _handle_get_northbound_flow()
-                if _nb_result.get("status") == "available":
+        # Always fetch summary via tool (gives exact 亿 amount for report display).
+        # Skip if IntelAgent already fetched and we only need the delta.
+        try:
+            from src.agent.tools.data_tools import _handle_get_northbound_flow
+            _nb_result = _handle_get_northbound_flow()
+            if _nb_result.get("status") == "available":
+                if _nb_delta is None:
                     _nb_delta = _nb_result.get("score_delta", 0)
+                if not _nb_signal:
                     _nb_signal = _nb_result.get("signal")
-                    _nb_summary = _nb_result.get("summary")
-                else:
-                    _nb_delta = 0
-            except Exception as _nb_err:
-                logger.debug("[Orchestrator] northbound fallback failed: %s", _nb_err)
+                _nb_summary = _nb_result.get("summary")
+            elif _nb_delta is None:
                 _nb_delta = 0
-        if not _nb_summary and _nb_result and _nb_result.get("status") == "available":
-            _nb_summary = _nb_result.get("summary")
+        except Exception as _nb_err:
+            logger.debug("[Orchestrator] northbound fallback failed: %s", _nb_err)
+            if _nb_delta is None:
+                _nb_delta = 0
+        # Fallback: construct summary from signal when tool call failed
+        if not _nb_summary and _nb_signal:
+            _NB_SIGNAL_TEXT = {
+                "strong_inflow": "北向资金强势净流入，市场情绪偏多",
+                "inflow": "北向资金净流入，市场情绪略偏多",
+                "neutral": "北向资金中性，市场情绪平稳",
+                "outflow": "北向资金净流出，市场情绪略偏空",
+                "strong_outflow": "北向资金强势净流出，市场情绪偏空",
+            }
+            _nb_summary = _NB_SIGNAL_TEXT.get(_nb_signal)
         try:
             _nb_int = int(_nb_delta)
         except (TypeError, ValueError):
