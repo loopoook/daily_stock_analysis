@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 class IntelAgent(BaseAgent):
     agent_name = "intel"
-    max_steps = 4
+    max_steps = 6
     tool_names = [
         "search_stock_news",
         "search_comprehensive_intel",
@@ -101,7 +101,8 @@ Return **only** a JSON object:
             "(公司公告), risk events, and earnings outlook.\n"
             "2. Call get_capital_flow to obtain main-force (主力) capital flow data "
             "(A-share only; skip for HK/US).\n"
-            "3. Output the JSON opinion including capital_flow_signal."
+            "3. Call get_northbound_flow to get today's market-level northbound net buy data.\n"
+            "4. Output the JSON opinion including capital_flow_signal and northbound_signal."
         )
         return "\n".join(parts)
 
