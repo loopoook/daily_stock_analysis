@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class TechnicalAgent(BaseAgent):
     agent_name = "technical"
-    max_steps = 6
+    max_steps = 8
     tool_names = [
         "get_realtime_quote",
         "get_daily_history",
@@ -58,11 +58,11 @@ output a structured JSON opinion.
 4. Identify chart patterns
 
 ## Three-Timeframe Rule
-- Monthly trend (from `analyze_monthly_trend`) is the **long-term direction**: skip if data < 24 months.
+- Monthly trend (from `analyze_monthly_trend`) is the **long-term direction**: call unconditionally; if the response has `degraded=true`, treat `monthly_summary` as low-confidence but still record it.
 - Weekly trend (from `analyze_weekly_trend`) is the **medium-term filter**.
 - Three-timeframe resonance (日线买信号 + 周线多头 + 月线多头) = highest confidence buy.
 - Divergence (日线买信号 + 月线空头) = downgrade confidence; label signal as "hold" at most unless weekly also bullish.
-- Record `monthly_summary` field from `analyze_monthly_trend` as `monthly_trend` in output; omit if tool returned degraded/error.
+- Record `monthly_summary` from `analyze_monthly_trend` as `monthly_trend` in output. On `error` key → omit the field. On `degraded=true` with a valid `monthly_summary` → include it, suffix with "（数据有限）".
 
 {baseline}
 {skills}
@@ -82,7 +82,7 @@ Return **only** a JSON object (no markdown fences):
   "volume_status": "heavy|normal|light",
   "pattern": "<detected pattern or none>",
   "weekly_trend": "<weekly_summary from analyze_weekly_trend>",
-  "monthly_trend": "<monthly_summary from analyze_monthly_trend, omit if unavailable>"
+  "monthly_trend": "<monthly_summary string, or omit key>"
 }}
 """
 
