@@ -1747,11 +1747,12 @@ class AkshareFetcher(BaseFetcher):
 
     def get_sector_rankings(self, n: int = 5) -> Optional[Tuple[List[Dict], List[Dict]]]:
         """
-        获取行业板块涨跌榜
+        获取板块涨跌榜（概念板块优先，更贴近实际交易热点）
 
         数据源优先级：
-        1. 东财接口 (ak.stock_board_industry_name_em)
-        2. 新浪接口 (ak.stock_sector_spot)
+        1. 东财概念板块 (ak.stock_board_concept_name_em) — 人工智能、半导体等
+        2. 东财行业板块 (ak.stock_board_industry_name_em) — 证监会行业分类（较粗）
+        3. 新浪概念板块 (ak.stock_sector_spot indicator='概念')
         """
         import akshare as ak
 
@@ -1772,35 +1773,50 @@ class AkshareFetcher(BaseFetcher):
                 for _, row in bottom.iterrows()
             ]
             return top_sectors, bottom_sectors
-        
-        # 优先东财接口
+
+        # 优先东财概念板块（人工智能、半导体、新能源汽车等交易者关注的热点）
         try:
             self._set_random_user_agent()
             self._enforce_rate_limit()
 
-            logger.info("[API调用] ak.stock_board_industry_name_em() 获取板块排行...")
+            logger.info("[API调用] ak.stock_board_concept_name_em() 获取概念板块排行...")
+            df = ak.stock_board_concept_name_em()
+            if df is not None and not df.empty:
+                change_col = '涨跌幅'
+                name = '板块名称'
+                return _get_rank_top_n(df, change_col, name, n)
+
+        except Exception as e:
+            logger.warning(f"[Akshare] 东财概念板块排行失败: {e}，尝试东财行业板块")
+
+        # 概念板块失败后，回退到东财行业板块
+        try:
+            self._set_random_user_agent()
+            self._enforce_rate_limit()
+
+            logger.info("[API调用] ak.stock_board_industry_name_em() 获取行业板块排行...")
             df = ak.stock_board_industry_name_em()
             if df is not None and not df.empty:
                 change_col = '涨跌幅'
                 name = '板块名称'
                 return _get_rank_top_n(df, change_col, name, n)
-            
-        except Exception as e:
-            logger.warning(f"[Akshare] 东财接口获取行业板块排行失败: {e}，尝试新浪接口")
 
-        # 东财失败后，尝试新浪接口
+        except Exception as e:
+            logger.warning(f"[Akshare] 东财行业板块排行失败: {e}，尝试新浪接口")
+
+        # 东财全部失败后，尝试新浪接口
         try:
             self._set_random_user_agent()
             self._enforce_rate_limit()
 
-            logger.info("[API调用] ak.stock_sector_spot() 获取行业板块排行(新浪)...")
-            df = ak.stock_sector_spot(indicator='行业')
+            logger.info("[API调用] ak.stock_sector_spot() 获取概念板块排行(新浪)...")
+            df = ak.stock_sector_spot(indicator='概念')
             if df is None or df.empty:
                 return None
             change_col = '涨跌幅'
             name = '板块'
             return _get_rank_top_n(df, change_col, name, n)
-        
+
         except Exception as e:
             logger.error(f"[Akshare] 新浪接口获取板块排行也失败: {e}")
             return None
@@ -1915,3 +1931,4 @@ if __name__ == "__main__":
             print("未获取到行业板块排名数据")
     except Exception as e:
         print(f"[行业板块排名] 获取失败: {e}")
+
